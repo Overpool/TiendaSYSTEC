@@ -1,5 +1,5 @@
 
-import { Facebook, Instagram, Phone, MapPin, Mail, MessageCircle, ChevronUp, Music } from 'lucide-react';
+import { Facebook, Instagram, MapPin, MessageCircle, ChevronUp, Music } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export const Footer = () => {

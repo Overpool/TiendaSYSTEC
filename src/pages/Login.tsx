@@ -1,7 +1,7 @@
 import { useState, type FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Lock, User, Eye, EyeOff, Mail, ArrowLeft, KeyRound } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Mail, ArrowLeft } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 type AuthMode = 'login' | 'register' | 'recover';
