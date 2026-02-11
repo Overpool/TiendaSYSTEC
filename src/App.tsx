@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Navbar } from './components/Layout/Navbar';
@@ -62,14 +62,12 @@ const AdminLayout = () => {
   );
 };
 
-
 function App() {
-  // const { loadInitialData } = useStore();
+  const { loadInitialData } = useStore();
 
-  // useEffect(() => {
-  //   loadInitialData();
-  // }, []);
-  console.log("APP RENDERIZANDO")
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
   return (
     <BrowserRouter>
