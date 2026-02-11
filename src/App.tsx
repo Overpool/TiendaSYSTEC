@@ -69,6 +69,7 @@ function App() {
   // useEffect(() => {
   //   loadInitialData();
   // }, []);
+  console.log("APP RENDERIZANDO")
 
   return (
     <BrowserRouter>
