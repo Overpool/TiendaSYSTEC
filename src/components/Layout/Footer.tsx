@@ -44,25 +44,23 @@ export const Footer = () => {
                     {/* Contact Info */}
                     <div className="w-full lg:w-1/3 text-sm md:text-base space-y-3 text-center lg:text-left">
                         <p className="font-medium text-slate-800">
-                            <span className="font-bold text-slate-600">RUC:</span> 20611939770 <span className="hidden sm:inline">|</span> <span className="block sm:inline mt-1 sm:mt-0"><span className="font-bold text-slate-600">Correo:</span> ventas@sies.pe</span>
+                            <span className="font-bold text-slate-600">RUC:</span> 20611939770 <span className="hidden sm:inline">|</span> <span className="block sm:inline mt-1 sm:mt-0"><span className="font-bold text-slate-600">Correo:</span> systecfdc@gmail.com</span>
                         </p>
 
                         <div className="flex flex-wrap justify-center lg:justify-start gap-x-2 gap-y-1">
                             <span><span className="font-bold text-slate-600">Ventas:</span> 973 736 386</span>
                             <span className="hidden sm:inline">|</span>
-                            <span><span className="font-bold text-slate-600">Servicio Técnico:</span> 920 371 149</span>
-                            <span className="hidden sm:inline">|</span>
-                            <span><span className="font-bold text-slate-600">Internet:</span> 943 150 584</span>
+                            <span><span className="font-bold text-slate-600">Servicio Técnico:</span> 973 736 386</span>
                         </div>
 
                         <p>
-                            <span className="font-bold text-slate-600">Dirección:</span> Asociación Los Municipales Mz. G Lt. 17, Oficina Interior<br />
+                            <span className="font-bold text-slate-600">Dirección:</span> MZA. A LOTE. 1 URB. INGENIERIA, Oficina Interior<br />
                             Jesús Nazareno, Huamanga, Ayacucho
                         </p>
 
                         {/* Social Icons */}
                         <div className="flex justify-center lg:justify-start gap-4 mt-6">
-                            <a href="#" className="w-10 h-10 bg-[#3b5998] text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm">
+                            <a href="https://www.facebook.com/share/1Gbz6p5FaW/" className="w-10 h-10 bg-[#3b5998] text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm" target="_blank" rel="noopener noreferrer">
                                 <Facebook size={20} />
                             </a>
                             <a href="#" className="w-10 h-10 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm">
@@ -80,8 +78,9 @@ export const Footer = () => {
                             <img src="../images/systec_logo.png" alt="" />
                         </div>
                         <div className="text-center text-slate-500 text-sm">
-                            <p>© SYSTEC FDC COORPORATION S.A.C. - 2025</p>
+                            <p>© SYSTEC FDC COORPORATION S.A.C. - 2026</p>
                             <p>Todos los derechos reservados</p>
+                            <p>Desarrollado por: <a href="https://www.linkedin.com/in/luis-figueroa-arce-4185b8214/" target="_blank" rel="noopener noreferrer">Figueroa Arce Luis</a></p>
                         </div>
                     </div>
                 </div>

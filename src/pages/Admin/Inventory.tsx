@@ -1,161 +1,35 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import type { Product } from '../../types';
-import { Pencil, Trash2, Plus, PackagePlus, Search, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
+import { Pencil, Trash2, Plus, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Modal } from '../../components/UI/Modal';
 import Swal from 'sweetalert2';
-import { supabase } from '../../lib/supabase';
+import { ProductForm } from '../../components/Admin/ProductForm';
 
 export const Inventory = () => {
     const { products, addProduct, updateProduct, deleteProduct } = useStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isUploading, setIsUploading] = useState(false);
-
-    // Stock Update Modal (Quick Add)
-    const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-    const [stockUpdateId, setStockUpdateId] = useState<string | null>(null);
-    const [stockToAdd, setStockToAdd] = useState(0);
-
-    // Interface for form handling to allow empty strings during editing
-    interface ProductFormState {
-        id?: string;
-        name: string;
-        category: string;
-        brand: string;
-        price: number | string;
-        cost: number | string;
-        stock: number | string;
-        description: string;
-        image: string;
-        isSale: boolean;
-        discountPrice?: number | string;
-    }
-
-    const [formData, setFormData] = useState<ProductFormState>({
-        name: '', category: '', brand: '', price: '', cost: '', stock: '', description: '', image: '', isSale: false
-    });
 
     const filteredProducts = products.filter(product =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (product.code && product.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
         product.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Derive unique categories and brands from existing products
-    const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
-    const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || e.target.files.length === 0) {
-            return;
-        }
-
-        const file = e.target.files[0];
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        setIsUploading(true);
-
-        try {
-            const { error: uploadError } = await supabase.storage
-                .from('products')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                throw uploadError;
-            }
-
-            const { data } = supabase.storage
-                .from('products')
-                .getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, image: data.publicUrl }));
-            Swal.fire({
-                icon: 'success',
-                title: 'Imagen subida',
-                text: 'La imagen se ha cargado correctamente',
-                timer: 1500,
-                showConfirmButton: false
-            });
-
-        } catch (error: any) {
-            console.error('Error uploading image:', error.message);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'No se pudo subir la imagen. Asegúrate de haber creado el bucket "products" y que sea público.',
-            });
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
     const handleOpenModal = (product?: Product) => {
-        if (product) {
-            setEditingProduct(product);
-            setFormData({
-                ...product,
-                // Ensure values are numbers for existing products
-                price: product.price,
-                cost: product.cost,
-                stock: product.stock,
-                discountPrice: product.discountPrice
-            });
-        } else {
-            setEditingProduct(null);
-            setFormData({
-                name: '', category: '', brand: '', price: '', cost: '', stock: '', description: '', image: 'https://placehold.co/150', isSale: false, discountPrice: ''
-            });
-        }
+        setEditingProduct(product || null);
         setIsModalOpen(true);
     };
 
-    const handleSave = (e: FormEvent) => {
-        e.preventDefault();
-
-        const price = Number(formData.price);
-        const cost = Number(formData.cost);
-        const stock = Number(formData.stock);
-        const discountPrice = Number(formData.discountPrice || 0);
-
-        // Validation Logic
-        if (stock < 0) {
-            Swal.fire('Error', 'El stock no puede ser negativo', 'error');
-            return;
-        }
-        if (cost < 0) {
-            Swal.fire('Error', 'El costo no puede ser negativo', 'error');
-            return;
-        }
-        if (price < 0) {
-            Swal.fire('Error', 'El precio de venta no puede ser negativo', 'error');
-            return;
-        }
-        if (price < cost) {
-            Swal.fire('Error', 'El precio de venta no puede ser menor al costo', 'error');
-            return;
-        }
-        if (formData.isSale && discountPrice < 0) {
-            Swal.fire('Error', 'El precio de oferta no puede ser negativo', 'error');
-            return;
-        }
-
-        const productData = {
-            ...formData,
-            price,
-            cost,
-            stock,
-            discountPrice: formData.isSale ? discountPrice : undefined
-        } as Product;
-
+    const handleFormSubmit = (product: Product) => {
         if (editingProduct) {
-            updateProduct(editingProduct.id, productData);
+            updateProduct(editingProduct.id, product);
             Swal.fire({ icon: 'success', title: 'Producto Actualizado', timer: 1500, showConfirmButton: false });
         } else {
-            addProduct({ ...productData, id: Date.now().toString() });
+            addProduct(product);
             Swal.fire({ icon: 'success', title: 'Producto Agregado', timer: 1500, showConfirmButton: false });
         }
         setIsModalOpen(false);
@@ -176,19 +50,6 @@ export const Inventory = () => {
                 Swal.fire('¡Eliminado!', 'El producto ha sido eliminado.', 'success');
             }
         });
-    };
-
-    const handleRestock = (e: FormEvent) => {
-        e.preventDefault();
-        if (stockUpdateId) {
-            const product = products.find(p => p.id === stockUpdateId);
-            if (product) {
-                updateProduct(stockUpdateId, { stock: product.stock + Number(stockToAdd) });
-                Swal.fire({ icon: 'success', title: 'Stock Actualizado', timer: 1500, showConfirmButton: false });
-                setIsStockModalOpen(false);
-                setStockToAdd(0);
-            }
-        }
     };
 
     // Pagination
@@ -252,6 +113,7 @@ export const Inventory = () => {
                                         <img src={product.image} alt="" className="w-10 h-10 rounded object-cover bg-gray-100" />
                                         <div>
                                             <p className="font-medium text-slate-800">{product.name}</p>
+                                            <p className="text-xs text-slate-500 font-mono">{product.code}</p>
                                             {product.isSale && <span className="text-xs text-red-600 font-bold">OFERTA</span>}
                                         </div>
                                     </td>
@@ -266,12 +128,6 @@ export const Inventory = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right space-x-2">
-                                        <button
-                                            onClick={() => { setStockUpdateId(product.id); setIsStockModalOpen(true); }}
-                                            className="p-2 text-green-600 hover:bg-green-50 rounded transition"
-                                            title="Add Stock">
-                                            <PackagePlus size={18} />
-                                        </button>
                                         <button
                                             onClick={() => handleOpenModal(product)}
                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded transition">
@@ -328,139 +184,11 @@ export const Inventory = () => {
             </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingProduct ? 'Editar Producto' : 'Nuevo Producto'}>
-                <form onSubmit={handleSave} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Nombre del Producto</label>
-                        <input className="w-full border p-2 rounded" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Marca</label>
-                            <input
-                                list="brands-list"
-                                className="w-full border p-2 rounded"
-                                value={formData.brand}
-                                onChange={e => setFormData({ ...formData, brand: e.target.value })}
-                                placeholder="Seleccionar o escribir nueva..."
-                            />
-                            <datalist id="brands-list">
-                                {uniqueBrands.map(b => <option key={b} value={b} />)}
-                            </datalist>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Categoría</label>
-                            <input
-                                list="categories-list"
-                                className="w-full border p-2 rounded"
-                                value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                placeholder="Seleccionar o escribir nueva..."
-                                required
-                            />
-                            <datalist id="categories-list">
-                                {uniqueCategories.map(c => <option key={c} value={c} />)}
-                            </datalist>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Stock</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="w-full border p-2 rounded disabled:bg-gray-100 disabled:text-gray-500"
-                                value={formData.stock}
-                                onChange={e => setFormData({ ...formData, stock: e.target.value })}
-                                required
-                                disabled={!!editingProduct}
-                            />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Costo</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="w-full border p-2 rounded"
-                                value={formData.cost}
-                                onChange={e => setFormData({ ...formData, cost: e.target.value })}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Precio Venta</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="w-full border p-2 rounded"
-                                value={formData.price}
-                                onChange={e => setFormData({ ...formData, price: e.target.value })}
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Imagen del Producto</label>
-                        <div className="mt-1 flex items-center gap-4">
-                            {formData.image && (
-                                <img src={formData.image} alt="Preview" className="w-16 h-16 object-cover rounded border" />
-                            )}
-                            <div className="flex-1">
-                                <label className="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center gap-2 justify-center transition">
-                                    <Upload size={20} />
-                                    <span>{isUploading ? 'Subiendo...' : 'Subir Imagen'}</span>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handleImageUpload}
-                                        disabled={isUploading}
-                                    />
-                                </label>
-                            </div>
-                        </div>
-                        {/* Hidden input to store URL if needed for manual override or debug, optional */}
-                        <input type="hidden" value={formData.image} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Descripción</label>
-                        <textarea className="w-full border p-2 rounded h-20" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <input type="checkbox" id="isSale" checked={formData.isSale} onChange={e => setFormData({ ...formData, isSale: e.target.checked })} />
-                        <label htmlFor="isSale" className="text-sm font-medium text-gray-700">¿En Oferta?</label>
-                    </div>
-                    {formData.isSale && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Precio Oferta</label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="w-full border p-2 rounded"
-                                value={formData.discountPrice}
-                                onChange={e => setFormData({ ...formData, discountPrice: e.target.value })}
-                            />
-                        </div>
-                    )}
-                    <button type="submit" className="w-full bg-red-600 text-white py-2 rounded font-bold hover:bg-red-700">Guardar</button>
-                </form>
-            </Modal>
-
-            <Modal isOpen={isStockModalOpen} onClose={() => setIsStockModalOpen(false)} title="Reabastecer">
-                <form onSubmit={handleRestock} className="space-y-4">
-                    <p className="text-sm text-gray-600">Agregando stock para {products.find(p => p.id === stockUpdateId)?.name}</p>
-                    <input
-                        type="number"
-                        className="w-full border p-3 rounded text-lg font-bold"
-                        placeholder="0"
-                        value={stockToAdd}
-                        onChange={e => setStockToAdd(Number(e.target.value))}
-                        autoFocus
-                    />
-                    <button type="submit" className="w-full bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700">Actualizar Stock</button>
-                </form>
+                <ProductForm
+                    initialData={editingProduct}
+                    onSubmit={handleFormSubmit}
+                    onCancel={() => setIsModalOpen(false)}
+                />
             </Modal>
         </div>
     );

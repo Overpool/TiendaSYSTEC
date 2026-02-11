@@ -4,6 +4,7 @@ create extension if not exists "uuid-ossp";
 -- Products Table
 create table public.products (
   id uuid default uuid_generate_v4() primary key,
+  code text, -- Product SKU/Code
   name text not null,
   brand text,
   category text,
@@ -19,6 +20,7 @@ create table public.products (
 -- Sales Table
 create table public.sales (
   id uuid default uuid_generate_v4() primary key,
+  user_id text, -- Optional link to registered user
   total numeric not null,
   payment_method text not null,
   date timestamp with time zone default now(),
@@ -34,6 +36,14 @@ create table public.users (
   password text not null,
   role text not null check (role in ('admin', 'employee', 'shopper')),
   permissions text[],
+  wishlist text[] default array[]::text[], -- Array of product IDs
+  -- New Optional Fields
+  dni text,
+  phone text,
+  address text,
+  city text,
+  zip_code text,
+  country text,
   created_at timestamp with time zone default now()
 );
 

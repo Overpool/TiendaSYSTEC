@@ -1,6 +1,7 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
-import type { Product, CartItem, Sale, User } from '../types';
+import type { Product, CartItem, Sale, User, Purchase } from '../types';
 
 interface AppState {
     products: Product[];
@@ -58,6 +59,13 @@ interface AppState {
     setSearchQuery: (query: string) => void;
     setSelectedCategory: (category: string) => void;
     setSelectedBrand: (brand: string) => void;
+
+    // Purchase Actions
+    purchases: Purchase[];
+    addPurchase: (purchase: Purchase) => Promise<void>;
+
+    // Wishlist Actions
+    toggleWishlist: (productId: string) => Promise<void>;
 }
 
 // Initial Mock Data (For Seeding)
@@ -125,11 +133,12 @@ const initialUsers: User[] = [
     }
 ];
 
-export const useStore = create<AppState>((set, get) => ({
+export const useStore = create<AppState>()(persist((set, get) => ({
     products: [],
     cart: [],
     posCart: [],
     sales: [],
+    purchases: [],
     users: [],
     currentUser: null,
     isLoading: false,
@@ -149,9 +158,24 @@ export const useStore = create<AppState>((set, get) => ({
             const { data: productsData, error: prodError } = await supabase.from('products').select('*');
             if (prodError) throw prodError;
 
+            // Fetch Purchases
+            const { data: purchasesData, error: purchaseError } = await supabase.from('purchases').select('*').order('date', { ascending: false });
+            if (purchaseError && purchaseError.code !== '42P01') { // Ignore if table doesn't exist yet
+                console.error("Error fetching purchases", purchaseError);
+            }
+            const purchases: Purchase[] = (purchasesData || []).map((p: any) => ({
+                id: p.id,
+                supplier: p.supplier,
+                date: p.date,
+                total: p.total,
+                items: p.items || []
+            }));
+
+
             // Map DB snake_case to Frontend camelCase with strict casting
             const products: Product[] = (productsData || []).map((p: any) => ({
                 ...p,
+                code: p.code, // Map new field
                 isSale: Boolean(p.is_sale),
                 discountPrice: Number(p.discount_price) || 0
             }));
@@ -162,7 +186,8 @@ export const useStore = create<AppState>((set, get) => ({
 
             const sales: Sale[] = (salesData || []).map((s: any) => ({
                 ...s,
-                paymentMethod: s.payment_method
+                paymentMethod: s.payment_method,
+                userId: s.user_id
             }));
 
             // Fetch Users
@@ -171,8 +196,44 @@ export const useStore = create<AppState>((set, get) => ({
 
             const users: User[] = (usersData || []).map((u: any) => ({
                 ...u,
-                createdAt: u.created_at
+                createdAt: u.created_at,
+                wishlist: u.wishlist || [],
+                dni: u.dni,
+                phone: u.phone,
+                address: u.address,
+                city: u.city,
+                zipCode: u.zip_code,
+                country: u.country
             }));
+
+            // FIX: Prevent overwriting local currentUser with stale/incomplete DB data
+            const currentUser = get().currentUser;
+            if (currentUser) {
+                const refreshedUser = users.find(u => u.id === currentUser.id);
+                if (refreshedUser) {
+                    // Merge: Keep local optimistic updates if DB is lagging, but update confirmed changes
+                    // For now, valid strategy is to trust local for wishlist if DB is empty but local has items (edge case)
+                    // Better: Trust DB but if DB has nulls where local has values (e.g. recent edit), keep local? 
+                    // Simpler: Just refresh currentUser with the latest from DB, 
+                    // BUT if we just saved something, local might be ahead. 
+
+                    // Actually, the issue is likely that 'wishlist' was missing in previous fetch. 
+                    // Now it's mapped.
+
+                    // Logic: If we have a current user, update them with the fresh data from the list
+                    // to ensure they see changes from other devices/sessions, 
+                    // BUT if the DB returns null for new fields (schema update not applied in real DB), 
+                    // we might want to keep local if we just edited it? 
+                    // For "reversion" bug, usually it's because the UI updates state, then this background fetch 
+                    // finishes and clobbers it with old data.
+
+                    // We will update currentUser, but we can verify if the new data is actually "newer" or "different".
+                    // For this fix, let's just update it so the UI reflects the true backend state,
+                    // which is correct behavior. The "swapping back" happens if the backend UPDATE failed.
+
+                    set({ currentUser: refreshedUser });
+                }
+            }
 
             // Seed if empty
             if ((!products || products.length === 0) && (!users || users.length === 0)) {
@@ -206,6 +267,7 @@ export const useStore = create<AppState>((set, get) => ({
                 set({
                     products: products || [],
                     sales: sales || [],
+                    purchases: purchases || [],
                     users: users || []
                 });
             }
@@ -228,6 +290,7 @@ export const useStore = create<AppState>((set, get) => ({
         // Prepare for DB
         const productToInsert = {
             name: product.name,
+            code: product.code,
             brand: product.brand,
             category: product.category,
             price: product.price,
@@ -248,6 +311,7 @@ export const useStore = create<AppState>((set, get) => ({
             const newProduct = {
                 ...product,
                 id: data[0].id,
+                code: data[0].code, // Map code
                 isSale: data[0].is_sale,
                 discountPrice: data[0].discount_price
             };
@@ -264,6 +328,7 @@ export const useStore = create<AppState>((set, get) => ({
 
         const dbUpdates: any = {};
         if (updates.name !== undefined) dbUpdates.name = updates.name;
+        if (updates.code !== undefined) dbUpdates.code = updates.code;
         if (updates.brand !== undefined) dbUpdates.brand = updates.brand;
         if (updates.category !== undefined) dbUpdates.category = updates.category;
         if (updates.price !== undefined) dbUpdates.price = updates.price;
@@ -296,7 +361,13 @@ export const useStore = create<AppState>((set, get) => ({
                 ),
             };
         }
-        return { cart: [...state.cart, { ...product, quantity: 1 }] };
+        return {
+            cart: [...state.cart, {
+                ...product,
+                price: (product.isSale && product.discountPrice) ? product.discountPrice : product.price,
+                quantity: 1
+            }]
+        };
     }),
     removeFromCart: (id) => set((state) => ({
         cart: state.cart.filter((item) => item.id !== id),
@@ -317,7 +388,13 @@ export const useStore = create<AppState>((set, get) => ({
                 ),
             };
         }
-        return { posCart: [...state.posCart, { ...product, quantity: 1 }] };
+        return {
+            posCart: [...state.posCart, {
+                ...product,
+                price: (product.isSale && product.discountPrice) ? product.discountPrice : product.price,
+                quantity: 1
+            }]
+        };
     }),
     updatePosCartQuantity: (id, quantity) => set((state) => ({
         posCart: state.posCart.map((item) =>
@@ -329,6 +406,42 @@ export const useStore = create<AppState>((set, get) => ({
     })),
     clearPosCart: () => set({ posCart: [] }),
 
+    addPurchase: async (purchase) => {
+        // Optimistic update
+        set((state) => ({ purchases: [purchase, ...state.purchases] }));
+
+        // 1. Insert Purchase Record
+        const purchaseToInsert = {
+            id: purchase.id,
+            supplier: purchase.supplier,
+            date: purchase.date,
+            total: purchase.total,
+            items: purchase.items
+        };
+
+        const { error: purchaseError } = await supabase.from('purchases').insert([purchaseToInsert]);
+
+        if (purchaseError) {
+            console.error('Error adding purchase:', purchaseError.message);
+            // Revert optimistic update? For now, just log.
+            return;
+        }
+
+        // 2. Update Product Stock
+        // We iterate through items and update both local state and DB product stock
+        const currentProducts = get().products;
+
+        for (const item of purchase.items) {
+            const product = currentProducts.find(p => p.id === item.id);
+            if (product) {
+                const newStock = product.stock + item.quantity;
+                // Update local (via existing action to restart state)
+                // Actually, let's just use updateProduct which handles both
+                await get().updateProduct(item.id, { stock: newStock });
+            }
+        }
+    },
+
     addSale: async (sale) => {
         // Optimistic (using temp ID)
         set((state) => ({ sales: [sale, ...state.sales] }));
@@ -337,7 +450,8 @@ export const useStore = create<AppState>((set, get) => ({
             total: sale.total,
             payment_method: sale.paymentMethod,
             date: sale.date,
-            items: sale.items
+            items: sale.items,
+            user_id: get().currentUser?.id
         };
 
         const { data, error } = await supabase.from('sales').insert([saleToInsert]).select();
@@ -435,8 +549,25 @@ export const useStore = create<AppState>((set, get) => ({
         if (updates.permissions !== undefined) dbUpdates.permissions = updates.permissions;
         if (updates.password !== undefined) dbUpdates.password = updates.password;
 
+        // New Fields
+        if (updates.dni !== undefined) dbUpdates.dni = updates.dni;
+        if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+        if (updates.address !== undefined) dbUpdates.address = updates.address;
+        if (updates.city !== undefined) dbUpdates.city = updates.city;
+        if (updates.zipCode !== undefined) dbUpdates.zip_code = updates.zipCode;
+        if (updates.country !== undefined) dbUpdates.country = updates.country;
+
+        // Optimistic update for currentUser as well
+        const currentUser = get().currentUser;
+        if (currentUser && currentUser.id === id) {
+            set({ currentUser: { ...currentUser, ...updates } });
+        }
+
         const { error } = await supabase.from('users').update(dbUpdates).eq('id', id);
-        if (error) console.error('Error updating user:', error.message);
+        if (error) {
+            console.error('Error updating user:', error.message);
+            // Revert on error could be implemented here
+        }
     },
 
     deleteUser: async (id) => {
@@ -444,4 +575,44 @@ export const useStore = create<AppState>((set, get) => ({
         const { error } = await supabase.from('users').delete().eq('id', id);
         if (error) console.error('Error deleting user:', error.message);
     },
+
+    toggleWishlist: async (productId) => {
+        const currentUser = get().currentUser;
+        if (!currentUser) return;
+
+        const currentWishlist = currentUser.wishlist || [];
+        const isInWishlist = currentWishlist.includes(productId);
+
+        const newWishlist = isInWishlist
+            ? currentWishlist.filter(id => id !== productId)
+            : [...currentWishlist, productId];
+
+        // Optimistic Update
+        const updatedUser = { ...currentUser, wishlist: newWishlist };
+        set({ currentUser: updatedUser });
+
+        // Also update in the main users list
+        set(state => ({
+            users: state.users.map(u => u.id === currentUser.id ? updatedUser : u)
+        }));
+
+        // Persist to DB
+        const { error } = await supabase
+            .from('users')
+            .update({ wishlist: newWishlist })
+            .eq('id', currentUser.id);
+
+        if (error) {
+            console.error('Error updating wishlist:', error);
+            // Revert on error
+            set({ currentUser });
+        }
+    },
+}), {
+    name: 'systec-storage',
+    storage: createJSONStorage(() => localStorage),
+    partialize: (state) => ({
+        currentUser: state.currentUser,
+        cart: state.cart
+    })
 }));

@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { ShoppingCart, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ShoppingCart, X, ChevronLeft, ChevronRight, Plus, Heart } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 export const Store = () => {
@@ -14,7 +14,9 @@ export const Store = () => {
         loadInitialData,
         setSearchQuery,
         setSelectedCategory,
-        setSelectedBrand
+        setSelectedBrand,
+        toggleWishlist,
+        currentUser
     } = useStore();
 
     // Reset filters and load data on mount to ensure user sees all offers
@@ -36,21 +38,7 @@ export const Store = () => {
     const regularProducts = filteredProducts.filter(p => !p.isSale);
 
 
-    const [timeLeft, setTimeLeft] = useState(45900); // 12h 45m 00s in seconds
 
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    const formatTime = (seconds: number) => {
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = seconds % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
 
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
@@ -177,6 +165,20 @@ export const Store = () => {
                         -{(100 - (product.discountPrice! / product.price * 100)).toFixed(0)}%
                     </div>
                 )}
+                {currentUser && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWishlist(product.id);
+                        }}
+                        className={`absolute top-2 right-2 p-1.5 rounded-full shadow-sm transition-all z-10 ${currentUser.wishlist?.includes(product.id)
+                                ? 'bg-white text-red-500 shadow-md ring-1 ring-red-100'
+                                : 'bg-white/90 text-gray-400 hover:text-red-500 hover:scale-110'
+                            }`}
+                    >
+                        <Heart size={18} className={currentUser.wishlist?.includes(product.id) ? "fill-current" : ""} />
+                    </button>
+                )}
             </div>
 
             <div className="p-4">
@@ -232,26 +234,14 @@ export const Store = () => {
 
     return (
         <div className="space-y-12 bg-[#EDF1F5] min-h-screen p-4 sm:p-6 lg:p-8 rounded-xl">
-            {/* Hero Banner */}
-            <div className="bg-gradient-to-r from-red-500 to-orange-400 rounded-2xl p-8 sm:p-12 text-white shadow-lg relative overflow-hidden">
-                <div className="relative z-10">
-                    <h1 className="text-4xl sm:text-5xl font-bold mb-4">Super Ofertas</h1>
-                    <p className="text-xl opacity-90 mb-6">Hasta 70% dscto en electrónica</p>
-                    <button className="bg-white text-red-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 transition shadow-lg">
-                        Comprar
-                    </button>
-                </div>
-                <div className="absolute right-0 top-0 w-1/2 h-full bg-white/10 skew-x-12 transform translate-x-20"></div>
-            </div>
+
 
             {/* Flash Deals */}
             {salesProducts.length > 0 && (
                 <section>
                     <div className="flex items-center gap-4 mb-6">
                         <h2 className="text-2xl font-bold text-gray-900">Ofertas Relámpago</h2>
-                        <div className="text-sm bg-black text-white px-2 py-1 rounded">
-                            Termina en {formatTime(timeLeft)}
-                        </div>
+
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                         {salesProducts.map(product => (

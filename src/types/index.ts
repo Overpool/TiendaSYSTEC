@@ -1,5 +1,6 @@
 export interface Product {
     id: string;
+    code?: string;
     name: string;
     brand: string;
     category: string;
@@ -18,10 +19,27 @@ export interface CartItem extends Product {
 
 export interface Sale {
     id: string;
+    userId?: string;
     items: CartItem[];
     total: number;
     date: string;
     paymentMethod: 'cash' | 'card' | 'yape' | 'plin';
+}
+
+export interface PurchaseItem {
+    id: string; // Product ID
+    name: string;
+    code?: string;
+    quantity: number;
+    cost: number;
+}
+
+export interface Purchase {
+    id: string;
+    supplier: string;
+    date: string;
+    total: number;
+    items: PurchaseItem[];
 }
 
 export interface Statistics {
@@ -37,5 +55,13 @@ export interface User {
     password?: string;
     role: 'admin' | 'employee' | 'shopper';
     permissions?: string[]; // e.g. ['inventory', 'pos', 'sales', 'users']
+    wishlist?: string[]; // Product IDs
+    // Optional Profile Fields
+    dni?: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    zipCode?: string;
+    country?: string;
     createdAt: string;
 }

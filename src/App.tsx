@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Admin/Dashboard';
 import { Inventory } from './pages/Admin/Inventory';
 import { POS } from './pages/Admin/POS';
 import { SalesHistory } from './pages/Admin/SalesHistory';
+import { Purchases } from './pages/Admin/Purchases';
 import { useStore } from './store/useStore';
 import { Users } from './pages/Admin/Users';
 import { Reports } from './pages/Admin/Reports';
@@ -85,6 +86,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="pos" element={<POS />} />
+          <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<SalesHistory />} />
           <Route path="users" element={<Users />} />
           <Route path="users" element={<Users />} />

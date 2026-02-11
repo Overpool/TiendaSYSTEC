@@ -18,6 +18,7 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
         { to: '/admin', icon: LayoutDashboard, label: 'Panel Principal', permission: 'admin', end: true },
         { to: '/admin/inventory', icon: Package, label: 'Inventario', permission: 'inventory' },
         { to: '/admin/pos', icon: ShoppingCart, label: 'Punto de Venta', permission: 'pos' },
+        { to: '/admin/purchases', icon: TrendingUp, label: 'Compras', permission: 'inventory' },
         { to: '/admin/sales', icon: History, label: 'Historial Ventas', permission: 'sales' },
         { to: '/admin/reports', icon: TrendingUp, label: 'Reportes', permission: 'admin' },
         { to: '/admin/users', icon: Users, label: 'Usuarios', permission: 'users' },
