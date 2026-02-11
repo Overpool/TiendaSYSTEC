@@ -63,38 +63,47 @@ const AdminLayout = () => {
 };
 
 function App() {
-  const { loadInitialData } = useStore();
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <Routes>
-        {/* Public Store Routes */}
-        <Route path="/" element={<StoreLayout />}>
-          <Route index element={<Store />} />
-          <Route path="cart" element={<Cart />} />
-        </Route>
-
-        <Route path="/login" element={<Login />} />
-
-        {/* Admin Routes */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="inventory" element={<Inventory />} />
-          <Route path="pos" element={<POS />} />
-          <Route path="purchases" element={<Purchases />} />
-          <Route path="sales" element={<SalesHistory />} />
-          <Route path="users" element={<Users />} />
-          <Route path="users" element={<Users />} />
-          <Route path="reports" element={<Reports />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <div style={{ color: "red", fontSize: "40px" }}>
+      TEST FUNCIONA
+    </div>
   );
 }
+
+
+// function App() {
+//   const { loadInitialData } = useStore();
+
+//   useEffect(() => {
+//     loadInitialData();
+//   }, []);
+
+//   return (
+//     <BrowserRouter>
+//       <ScrollToTop />
+//       <Routes>
+//         {/* Public Store Routes */}
+//         <Route path="/" element={<StoreLayout />}>
+//           <Route index element={<Store />} />
+//           <Route path="cart" element={<Cart />} />
+//         </Route>
+
+//         <Route path="/login" element={<Login />} />
+
+//         {/* Admin Routes */}
+//         <Route path="/admin" element={<AdminLayout />}>
+//           <Route index element={<Dashboard />} />
+//           <Route path="inventory" element={<Inventory />} />
+//           <Route path="pos" element={<POS />} />
+//           <Route path="purchases" element={<Purchases />} />
+//           <Route path="sales" element={<SalesHistory />} />
+//           <Route path="users" element={<Users />} />
+//           <Route path="users" element={<Users />} />
+//           <Route path="reports" element={<Reports />} />
+//         </Route>
+//       </Routes>
+//     </BrowserRouter>
+//   );
+// }
 
 export default App;
