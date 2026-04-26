@@ -66,8 +66,26 @@ export const Inventory = () => {
         setCurrentPage(pageNumber);
     };
 
+    // Dynamic totals based on filtered products
+    const totalPrecioVenta = filteredProducts.reduce((sum, p) => sum + (p.price * p.stock), 0);
+    const totalPrecioCosto = filteredProducts.reduce((sum, p) => sum + (p.cost * p.stock), 0);
+
     return (
         <div className="space-y-6">
+            {/* Totals Summary */}
+            <div className="flex flex-wrap justify-end gap-6">
+                <div className="text-right">
+                    <span className="text-sm font-semibold text-slate-600">Total precio venta: </span>
+                    <span className="text-lg font-bold text-green-600">S/ {totalPrecioVenta.toFixed(2)}</span>
+                </div>
+                <div className="text-right">
+                    <span className="text-sm font-semibold text-slate-600">Total precio costo: </span>
+                    <span className="text-lg font-bold text-red-600">S/ {totalPrecioCosto.toFixed(2)}</span>
+                </div>
+            </div>
+
+            <hr className="border-slate-200" />
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-2xl font-bold text-slate-800">Gestión de Inventario</h2>
 

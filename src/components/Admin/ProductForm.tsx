@@ -28,6 +28,7 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
         price: number | string;
         cost: number | string;
         stock: number | string;
+        minStock: number | string;
         description: string;
         image: string;
         isSale: boolean;
@@ -42,11 +43,12 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
                 price: initialData.price,
                 cost: initialData.cost,
                 stock: initialData.stock,
+                minStock: initialData.minStock || 0,
                 discountPrice: initialData.discountPrice
             };
         }
         return {
-            name: '', code: '', category: '', brand: '', price: '', cost: '', stock: '', description: '', image: 'https://placehold.co/150', isSale: false, discountPrice: ''
+            name: '', code: '', category: '', brand: '', price: '', cost: '', stock: '', minStock: '', description: '', image: 'https://placehold.co/150', isSale: false, discountPrice: ''
         };
     });
 
@@ -102,11 +104,16 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
         const price = Number(formData.price);
         const cost = Number(formData.cost);
         const stock = Number(formData.stock);
+        const minStock = Number(formData.minStock || 0);
         const discountPrice = Number(formData.discountPrice || 0);
 
         // Validation Logic
         if (stock < 0) {
             Swal.fire('Error', 'El stock no puede ser negativo', 'error');
+            return;
+        }
+        if (minStock < 0) {
+            Swal.fire('Error', 'La existencia mínima no puede ser negativa', 'error');
             return;
         }
         if (cost < 0) {
@@ -141,6 +148,7 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
             price,
             cost,
             stock,
+            minStock,
             discountPrice: formData.isSale ? discountPrice : undefined
         } as Product;
 

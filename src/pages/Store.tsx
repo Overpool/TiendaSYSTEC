@@ -28,7 +28,8 @@ export const Store = () => {
     }, []);
 
     const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = p.name.toLowerCase().includes(query) || (p.code && p.code.toLowerCase().includes(query));
         const matchesCategory = selectedCategory ? p.category === selectedCategory : true;
         const matchesBrand = selectedBrand ? p.brand === selectedBrand : true;
         return matchesSearch && matchesCategory && matchesBrand;
@@ -56,7 +57,15 @@ export const Store = () => {
 
     // Product Modal Component
     const ProductModal = ({ product, onClose }: { product: any, onClose: () => void }) => {
+        const [showFullDesc, setShowFullDesc] = useState(false);
         if (!product) return null;
+
+        const descText = product.description || "Este producto cuenta con características de alta calidad, diseñado para satisfacer las necesidades más exigentes. Fabricado con materiales duraderos y con garantía de fábrica.";
+        const descWords = descText.split(/\s+/);
+        const isLongDesc = descWords.length > 24;
+        const truncatedDesc = isLongDesc ? descWords.slice(0, 24).join(' ') + '...' : descText;
+        const outOfStock = product.stock <= 0;
+
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
                 <div
@@ -97,9 +106,14 @@ export const Store = () => {
                             <span className="text-sm font-bold text-gray-700">{product.stock} UND</span>
                         </div>
 
-                        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 leading-tight">{product.name}</h2>
+                        <h2 className={`font-bold text-gray-900 mb-4 leading-snug ${
+                            product.name.length > 70 ? 'text-base md:text-lg' :
+                            product.name.length > 45 ? 'text-lg md:text-xl' :
+                            'text-2xl md:text-3xl'
+                        }`}>{product.name}</h2>
 
-                        <div className="flex items-end justify-between mb-6">
+                        {/* Price + Add to Cart inline */}
+                        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
                             <div className="flex items-end gap-3">
                                 {product.isSale ? (
                                     <>
@@ -111,37 +125,35 @@ export const Store = () => {
                                 )}
                             </div>
 
-                            {/* Mobile Add to Cart Button (< 940px) */}
-                            <button
-                                onClick={() => {
-                                    handleAddToCart(product);
-                                    onClose();
-                                }}
-                                className="max-[940px]:flex hidden bg-red-600 text-white p-3 rounded-xl shadow-lg shadow-red-600/20 items-center justify-center gap-1 hover:bg-red-700 transition"
-                            >
-                                <ShoppingCart size={24} />
-                                <Plus size={20} className="stroke-[3]" />
-                            </button>
+                            {outOfStock ? (
+                                <span className="bg-gray-200 text-gray-500 px-5 py-3 rounded-xl font-bold text-sm tracking-wide">Agotado</span>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        handleAddToCart(product);
+                                        onClose();
+                                    }}
+                                    className="bg-red-600 text-white px-5 py-3 rounded-xl font-bold text-sm hover:bg-red-700 transition shadow-lg shadow-red-600/20 flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <ShoppingCart size={20} />
+                                    Agregar
+                                </button>
+                            )}
                         </div>
 
                         <div className="prose prose-slate mb-8 bg-gray-50 p-4 md:p-6 rounded-xl border border-gray-100">
                             <h3 className="text-lg font-bold text-gray-900 mb-2">Descripción del Producto</h3>
                             <p className="text-gray-600 leading-relaxed text-sm md:text-lg">
-                                {product.description || "Este producto cuenta con características de alta calidad, diseñado para satisfacer las necesidades más exigentes. Fabricado con materiales duraderos y con garantía de fábrica."}
+                                {showFullDesc ? descText : truncatedDesc}
                             </p>
-                        </div>
-
-                        <div className="mt-auto flex flex-col gap-4">
-                            <button
-                                onClick={() => {
-                                    handleAddToCart(product);
-                                    onClose();
-                                }}
-                                className="max-[940px]:hidden w-full bg-red-600 text-white py-3 md:py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 whitespace-nowrap"
-                            >
-                                <ShoppingCart size={24} />
-                                Agregar al Carrito
-                            </button>
+                            {isLongDesc && (
+                                <button
+                                    onClick={() => setShowFullDesc(!showFullDesc)}
+                                    className="text-red-600 font-bold text-sm mt-2 hover:underline"
+                                >
+                                    {showFullDesc ? 'Ver menos' : 'Ver más'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -149,7 +161,9 @@ export const Store = () => {
         );
     };
 
-    const ProductCard = ({ product }: { product: any }) => (
+    const ProductCard = ({ product }: { product: any }) => {
+        const outOfStock = product.stock <= 0;
+        return (
         <div
             onClick={() => setSelectedProduct(product)}
             className="bg-white rounded-lg shadow hover:shadow-xl transition duration-300 overflow-hidden group border border-gray-100 relative cursor-pointer"
@@ -158,11 +172,17 @@ export const Store = () => {
                 <img
                     src={product.image}
                     alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className={`w-full h-full object-cover transition-transform duration-300 ${outOfStock ? 'opacity-60 grayscale' : 'group-hover:scale-105'}`}
                 />
-                {product.isSale && (
+                {product.isSale && !outOfStock && (
                     <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
                         -{(100 - (product.discountPrice! / product.price * 100)).toFixed(0)}%
+                    </div>
+                )}
+                {outOfStock && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 z-[5]">
+                        <span className="bg-slate-700/90 text-white text-xs font-bold px-3 py-1 rounded absolute top-2 left-2 tracking-wide">Stock en camino</span>
+                        <span className="text-white text-xl sm:text-2xl font-extrabold drop-shadow-lg tracking-wide">Muy pronto</span>
                     </div>
                 )}
                 {currentUser && (
@@ -198,20 +218,25 @@ export const Store = () => {
                 </div>
 
                 <div className="flex items-center justify-between mt-auto">
-                    <span className="text-xs text-gray-500">{product.stock} vend.</span>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCart(product);
-                        }}
-                        className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-600 hover:text-white transition-colors"
-                    >
-                        <ShoppingCart size={20} />
-                    </button>
+                    <span className="text-xs text-gray-500">{product.stock} Und.</span>
+                    {outOfStock ? (
+                        <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">Agotado</span>
+                    ) : (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(product);
+                            }}
+                            className="bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-600 hover:text-white transition-colors"
+                        >
+                            <ShoppingCart size={20} />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
-    );
+    );};
+
 
     // Pagination for Regular Products
     const [currentPage, setCurrentPage] = useState(1);

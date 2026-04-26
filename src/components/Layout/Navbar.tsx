@@ -13,8 +13,8 @@ export const Navbar = () => {
     } = useStore();
     const [activeFilter, setActiveFilter] = useState<null | 'category' | 'brand' | 'mobile-category' | 'mobile-brand'>(null);
 
-    const uniqueCategories = Array.from(new Set(products.map(p => p.category)));
-    const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
+    const uniqueCategories = Array.from(new Set(products.map(p => p.category))).sort((a, b) => a.localeCompare(b));
+    const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 
     const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
