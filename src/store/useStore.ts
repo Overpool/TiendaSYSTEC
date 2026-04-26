@@ -78,6 +78,7 @@ const initialProducts: Product[] = [
         price: 45.99,
         cost: 20.00,
         stock: 100,
+        minStock: 10,
         description: 'Latest smart watch with health tracking',
         image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&q=80',
         isSale: true,
@@ -91,6 +92,7 @@ const initialProducts: Product[] = [
         price: 25.50,
         cost: 10.00,
         stock: 50,
+        minStock: 10,
         description: 'Noise cancelling earbuds',
         image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&q=80',
         isSale: false
@@ -103,6 +105,7 @@ const initialProducts: Product[] = [
         price: 15.99,
         cost: 5.00,
         stock: 200,
+        minStock: 10,
         description: 'Floral print summer dress',
         image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&q=80',
         isSale: true
@@ -115,6 +118,7 @@ const initialProducts: Product[] = [
         price: 55.00,
         cost: 30.00,
         stock: 15,
+        minStock: 5,
         description: 'RGB Backlit mechanical keyboard',
         image: 'https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=500&q=80',
         isSale: false
