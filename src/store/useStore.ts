@@ -22,7 +22,7 @@ interface AppState {
 
     // Product Actions
     setProducts: (products: Product[]) => void;
-    addProduct: (product: Product) => Promise<void>;
+    addProduct: (product: Product) => Promise<Product | null>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
 
@@ -159,7 +159,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         set({ isLoading: true, error: null });
         try {
             // Fetch Products
-            const { data: productsData, error: prodError } = await supabase.from('products').select('*');
+            const { data: productsData, error: prodError } = await supabase.from('products').select('*').order('name');
             if (prodError) throw prodError;
 
             // Fetch Purchases
@@ -179,7 +179,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             // Map DB snake_case to Frontend camelCase with strict casting
             const products: Product[] = (productsData || []).map((p: any) => ({
                 ...p,
-                code: p.code, // Map new field
+                minStock: p.min_stock || 0,
                 isSale: Boolean(p.is_sale),
                 discountPrice: Number(p.discount_price) || 0
             }));
@@ -288,41 +288,57 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     setProducts: (products) => set({ products }),
 
     addProduct: async (product) => {
-        // Optimistic update
-        set((state) => ({ products: [...state.products, product] }));
-
-        // Prepare for DB
+        // Prepare DB object (map camelCase to snake_case)
         const productToInsert = {
             name: product.name,
             code: product.code,
-            brand: product.brand,
             category: product.category,
+            brand: product.brand,
             price: product.price,
             cost: product.cost,
             stock: product.stock,
+            min_stock: product.minStock ?? 0,
             description: product.description,
             image: product.image,
             is_sale: product.isSale,
             discount_price: product.discountPrice
         };
 
-        const { data, error } = await supabase.from('products').insert([productToInsert]).select();
+        let { data, error } = await supabase.from('products').insert([productToInsert]).select();
 
+        // If min_stock column doesn't exist yet, retry without it
         if (error) {
             console.error('Error adding product:', error.message);
-        } else if (data) {
-            // Update state with real ID
-            const newProduct = {
+            if (error.message.includes('min_stock') || error.code === 'PGRST204' || error.code === '42703') {
+                const { min_stock, ...insertWithoutMinStock } = productToInsert as any;
+                const retry = await supabase.from('products').insert([insertWithoutMinStock]).select();
+                data = retry.data;
+                error = retry.error;
+            }
+
+            if (error) {
+                console.error('Product insert failed definitively:', error.message);
+                return null;
+            }
+        }
+
+        if (data && data.length > 0) {
+            const row = data[0];
+            const newProduct: Product = {
                 ...product,
-                id: data[0].id,
-                code: data[0].code, // Map code
-                isSale: data[0].is_sale,
-                discountPrice: data[0].discount_price
+                id: row.id,
+                code: row.code,
+                stock: row.stock,
+                minStock: row.min_stock ?? product.minStock ?? 0,
+                isSale: Boolean(row.is_sale),
+                discountPrice: row.discount_price
             };
             set((state) => ({
-                products: state.products.map(p => p.id === product.id ? newProduct : p)
+                products: [...state.products, newProduct]
             }));
+            return newProduct;
         }
+        return null;
     },
 
     updateProduct: async (id, updates) => {
@@ -411,10 +427,19 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     clearPosCart: () => set({ posCart: [] }),
 
     addPurchase: async (purchase) => {
-        // Optimistic update
-        set((state) => ({ purchases: [purchase, ...state.purchases] }));
+        // 1. Optimistic Updates
+        set((state) => ({
+            purchases: [purchase, ...state.purchases],
+            products: state.products.map(p => {
+                const item = purchase.items.find(i => i.id === p.id);
+                if (item) {
+                    return { ...p, stock: p.stock + item.quantity };
+                }
+                return p;
+            })
+        }));
 
-        // 1. Insert Purchase Record
+        // 2. Database Persistence (Purchase Record)
         const purchaseToInsert = {
             id: purchase.id,
             supplier: purchase.supplier,
@@ -427,29 +452,32 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
         if (purchaseError) {
             console.error('Error adding purchase:', purchaseError.message);
-            // Revert optimistic update? For now, just log.
-            return;
         }
 
-        // 2. Update Product Stock
-        // We iterate through items and update both local state and DB product stock
+        // 3. Persist Stock changes to DB
         const currentProducts = get().products;
-
         for (const item of purchase.items) {
             const product = currentProducts.find(p => p.id === item.id);
             if (product) {
-                const newStock = product.stock + item.quantity;
-                // Update local (via existing action to restart state)
-                // Actually, let's just use updateProduct which handles both
-                await get().updateProduct(item.id, { stock: newStock });
+                await supabase.from('products').update({ stock: product.stock }).eq('id', item.id);
             }
         }
     },
 
     addSale: async (sale) => {
-        // Optimistic (using temp ID)
-        set((state) => ({ sales: [sale, ...state.sales] }));
+        // 1. Optimistic Updates
+        set((state) => ({
+            sales: [sale, ...state.sales],
+            products: state.products.map(p => {
+                const item = sale.items.find(i => i.id === p.id);
+                if (item) {
+                    return { ...p, stock: p.stock - item.quantity };
+                }
+                return p;
+            })
+        }));
 
+        // 2. Database Persistence (Sale Record)
         const saleToInsert = {
             total: sale.total,
             payment_method: sale.paymentMethod,
@@ -472,14 +500,14 @@ export const useStore = create<AppState>()(persist((set, get) => ({
             set((state) => ({
                 sales: state.sales.map(s => s.id === sale.id ? newSale : s)
             }));
+        }
 
-            // Deduct stock
-            for (const item of sale.items) {
-                const currentProduct = get().products.find(p => p.id === item.id);
-                if (currentProduct) {
-                    const newStock = currentProduct.stock - item.quantity;
-                    await get().updateProduct(item.id, { stock: newStock });
-                }
+        // 3. Persist Stock changes to DB
+        const currentProducts = get().products;
+        for (const item of sale.items) {
+            const product = currentProducts.find(p => p.id === item.id);
+            if (product) {
+                await supabase.from('products').update({ stock: product.stock }).eq('id', item.id);
             }
         }
     },

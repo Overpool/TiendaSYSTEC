@@ -48,7 +48,7 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
             };
         }
         return {
-            name: '', code: '', category: '', brand: '', price: '', cost: '', stock: '', minStock: '', description: '', image: 'https://placehold.co/150', isSale: false, discountPrice: ''
+            name: '', code: '', category: '', brand: '', price: '', cost: '', stock: 0, minStock: '', description: '', image: 'https://placehold.co/150', isSale: false, discountPrice: ''
         };
     });
 
@@ -184,7 +184,7 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
                 </div>
             </div>
 
-            {/* Category & Stock */}
+            {/* Category & Min Stock */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Categoría</label>
@@ -201,18 +201,19 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
                     </datalist>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Stock</label>
+                    <label className="block text-sm font-medium text-gray-700">Mínimo de Existencias</label>
                     <input
                         type="number"
                         min="0"
-                        className="w-full border p-2 rounded disabled:bg-gray-100 disabled:text-gray-500"
-                        value={formData.stock}
-                        onChange={e => setFormData({ ...formData, stock: e.target.value })}
+                        className="w-full border p-2 rounded"
+                        value={formData.minStock}
+                        onChange={e => setFormData({ ...formData, minStock: e.target.value })}
                         required
-                        disabled={!!initialData} // Disable stock editing if updating existing product
                     />
                 </div>
             </div>
+
+            {/* Cost & Price */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-gray-700">Costo</label>

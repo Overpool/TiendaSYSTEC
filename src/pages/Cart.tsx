@@ -152,7 +152,7 @@ export const Cart = () => {
                                         }`}
                                 >
                                     <QrCode size={24} />
-                                    <span className="font-bold text-sm">Yape / Plin</span>
+                                    <span className="font-bold text-sm">Plin</span>
                                 </button>
                                 <button
                                     onClick={() => setPaymentMethod('card')}
@@ -180,7 +180,7 @@ export const Cart = () => {
                                     </div>
                                     <div className="space-y-1">
                                         <p className="font-bold text-purple-900">Escanea y paga S/ {total.toFixed(2)}</p>
-                                        <p className="text-xs text-purple-600">A nombre de: AliExpress Clone SAC</p>
+                                        <p className="text-xs text-purple-600">A nombre de: SYSTEC FDC COORPORATION SAC</p>
                                     </div>
 
                                     <div className="w-full pt-2">

@@ -58,6 +58,14 @@ export const Store = () => {
     // Product Modal Component
     const ProductModal = ({ product, onClose }: { product: any, onClose: () => void }) => {
         const [showFullDesc, setShowFullDesc] = useState(false);
+
+        useEffect(() => {
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = '';
+            };
+        }, []);
+
         if (!product) return null;
 
         const descText = product.description || "Este producto cuenta con características de alta calidad, diseñado para satisfacer las necesidades más exigentes. Fabricado con materiales duraderos y con garantía de fábrica.";
@@ -102,8 +110,6 @@ export const Store = () => {
                             </span>
                             <span className="mx-2 text-gray-300">|</span>
                             <span className="text-sm text-gray-500">{product.category}</span>
-                            <span className="mx-2 text-gray-300">|</span>
-                            <span className="text-sm font-bold text-gray-700">{product.stock} UND</span>
                         </div>
 
                         <h2 className={`font-bold text-gray-900 mb-4 leading-snug ${product.name.length > 70 ? 'text-base md:text-lg' :
@@ -216,8 +222,7 @@ export const Store = () => {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between mt-auto">
-                        <span className="text-xs text-gray-500">{product.stock} Und.</span>
+                    <div className="flex items-center justify-end mt-auto">
                         {outOfStock ? (
                             <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">Agotado</span>
                         ) : (

@@ -1,7 +1,7 @@
 import { useState, type FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Lock, User, Eye, EyeOff, Mail, ArrowLeft } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Mail, ArrowLeft, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 type AuthMode = 'login' | 'register' | 'recover';
@@ -108,7 +108,15 @@ export const Login = () => {
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md transition-all duration-300">
+            <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md transition-all duration-300 relative">
+                {/* X button - close without account */}
+                <button
+                    onClick={() => navigate('/')}
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full p-1.5 transition-all"
+                    title="Acceder sin cuenta"
+                >
+                    <X size={20} />
+                </button>
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-red-600 mb-2">SYSTEC FDC</h1>
                     <p className="text-gray-500">
@@ -205,6 +213,14 @@ export const Login = () => {
                             >
                                 ¿Olvidaste tu contraseña?
                             </button>
+                            <div className="border-t border-gray-100 pt-3 mt-1">
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="text-sm text-gray-400 hover:text-gray-600 hover:underline transition-colors"
+                                >
+                                    Acceder sin cuenta →
+                                </button>
+                            </div>
                         </>
                     )}
 

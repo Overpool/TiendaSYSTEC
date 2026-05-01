@@ -1,9 +1,31 @@
 
-import { Facebook, Instagram, MapPin, MessageCircle, ChevronUp, Music } from 'lucide-react';
+import { Facebook, Instagram, MapPin, MessageCircle, ChevronUp, Music, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+
+const WA_CONTACTS = [
+    {
+        name: 'Luis Figueroa Arce',
+        role: 'Asesor Técnico',
+        phone: '51973736386',
+        message: '¡Hola! Me comunico desde la tienda SYSTEC FDC. Quisiera recibir asesoría técnica. ¿Me puede ayudar?',
+    },
+    {
+        name: 'Franklin Durand Chavez',
+        role: 'Asesor de Ventas',
+        phone: '51928117537',
+        message: '¡Hola! Me comunico desde la tienda SYSTEC FDC. Estoy interesado/a en sus productos. ¿Me puede asesorar?',
+    },
+    {
+        name: 'Litmar Mamani',
+        role: 'Asesor de Proyectos',
+        phone: '51974609015',
+        message: '¡Hola! Me comunico desde la tienda SYSTEC FDC. Quisiera información sobre proyectos. ¿Me puede ayudar?',
+    },
+];
 
 export const Footer = () => {
     const [showScrollTop, setShowScrollTop] = useState(false);
+    const [showWhatsApp, setShowWhatsApp] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -87,16 +109,50 @@ export const Footer = () => {
             </div>
 
             {/* Floating Buttons */}
-            {/* WhatsApp - Left */}
-            <a
-                href="https://wa.me/51973736386"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="fixed bottom-6 left-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform duration-300 flex items-center justify-center"
-                title="WhatsApp"
-            >
-                <MessageCircle size={32} fill="white" className="text-[#25D366]" />
-            </a>
+            {/* WhatsApp Popup - Left */}
+            <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start gap-3">
+
+                {/* Contact Cards */}
+                <div
+                    className={`flex flex-col gap-2 transition-all duration-300 origin-bottom-left ${showWhatsApp
+                            ? 'opacity-100 translate-y-0 pointer-events-auto'
+                            : 'opacity-0 translate-y-4 pointer-events-none'
+                        }`}
+                >
+                    {WA_CONTACTS.map((contact) => (
+                        <a
+                            key={contact.phone}
+                            href={`https://wa.me/${contact.phone}?text=${encodeURIComponent(contact.message)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 bg-white rounded-2xl shadow-xl px-4 py-3 hover:bg-green-50 transition-all duration-200 group border border-green-100 min-w-[220px]"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-[#25D366] flex items-center justify-center shrink-0 shadow">
+                                <MessageCircle size={20} fill="white" className="text-white" />
+                            </div>
+                            <div className="leading-tight">
+                                <p className="font-bold text-slate-800 text-sm group-hover:text-green-700 transition-colors">{contact.name}</p>
+                                <p className="text-xs text-slate-500">{contact.role}</p>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+
+                {/* Toggle Button */}
+                <button
+                    onClick={() => setShowWhatsApp(prev => !prev)}
+                    className="bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform duration-300 flex items-center justify-center relative"
+                    title="Contáctanos por WhatsApp"
+                >
+                    {showWhatsApp
+                        ? <X size={28} />
+                        : <MessageCircle size={32} fill="white" className="text-[#25D366]" />
+                    }
+                    {!showWhatsApp && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-ping" />
+                    )}
+                </button>
+            </div>
 
             {/* Scroll Top - Right */}
             <button

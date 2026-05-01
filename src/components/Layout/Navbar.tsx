@@ -138,7 +138,7 @@ export const Navbar = () => {
                                 <User size={28} />
                                 <div className="flex flex-col text-xs leading-none">
                                     <span>Bienvenido</span>
-                                    <span className="font-bold">Identifícate</span>
+                                    <span className="font-bold">Iniciar Sesión</span>
                                 </div>
                             </Link>
                         )}
@@ -251,7 +251,7 @@ export const Navbar = () => {
                     <div className="flex items-center gap-2 py-1.5 animate-marquee sm:animate-none whitespace-nowrap">
                         <span className="text-red-600">📍</span>
                         <span className="font-bold">Ubicación:</span>
-                        <span>Av. Universitario</span>
+                        <span>Av. MZA. A LOTE. 1 URB. INGENIERIA, Oficina Interior</span>
                     </div>
                     <div className="hidden sm:flex items-center">
                         <div className="bg-red-600 text-white px-6 py-1.5 skew-x-[-15deg] flex items-center justify-center shadow-lg relative top-[1px]">

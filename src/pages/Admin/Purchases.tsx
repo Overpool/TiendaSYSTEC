@@ -81,20 +81,18 @@ export const Purchases = () => {
     };
 
     const handleNewProductSubmit = async (product: Product) => {
-        // Ensure stock is number
-        const productWithStock = {
-            ...product,
-            stock: Number(product.stock)
-        };
-
-        await addProduct(productWithStock);
+        const createdProduct = await addProduct(product);
+        
         setIsProductModalOpen(false);
 
-        // Auto-select the new product for purchase
-        setSelectedProduct(productWithStock);
-        setCost(productWithStock.cost);
-
-        Swal.fire('Producto Creado', 'Ahora puede agregarlo a la compra', 'success');
+        if (createdProduct) {
+            // Auto-select the newly created product with its real database ID
+            setSelectedProduct(createdProduct);
+            setCost(createdProduct.cost);
+            Swal.fire('Producto Creado', 'Ahora puede agregarlo a la compra', 'success');
+        } else {
+            Swal.fire('Error', 'No se pudo crear el producto. Inténtelo de nuevo.', 'error');
+        }
     };
 
     const filteredProducts = products.filter(p =>
