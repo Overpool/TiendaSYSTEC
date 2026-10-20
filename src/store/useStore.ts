@@ -21,7 +21,9 @@ interface AppState {
     loadInitialData: () => Promise<void>;
 
     // Product Actions
+    obtenerProductos: () => Promise<void>;
     setProducts: (products: Product[]) => void;
+    setProductos: (products: Product[] | any[]) => void;
     addProduct: (product: Product) => Promise<Product | null>;
     updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
     deleteProduct: (id: string) => Promise<void>;
@@ -137,6 +139,13 @@ const initialUsers: User[] = [
     }
 ];
 
+const mapProductData = (p: any): Product => ({
+    ...p,
+    minStock: p.minStock ?? p.min_stock ?? 0,
+    isSale: Boolean(p.isSale ?? p.is_sale),
+    discountPrice: Number(p.discountPrice ?? p.discount_price) || 0
+});
+
 export const useStore = create<AppState>()(persist((set, get) => ({
     products: [],
     cart: [],
@@ -158,9 +167,21 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     loadInitialData: async () => {
         set({ isLoading: true, error: null });
         try {
-            // Fetch Products
-            const { data: productsData, error: prodError } = await supabase.from('products').select('*').order('name');
-            if (prodError) throw prodError;
+            // Fetch Products desde el dominio propio (aprovechando caché)
+            let productsData: any[] = [];
+            try {
+                const respuesta = await fetch('https://www.systecfl.site/api/productos');
+                if (!respuesta.ok) {
+                    throw new Error(`Error en la respuesta del catálogo: ${respuesta.status} ${respuesta.statusText}`);
+                }
+                productsData = await respuesta.json();
+            } catch (catalogError) {
+                console.error("Error cargando el catálogo desde la API:", catalogError);
+                // Fallback a Supabase si la petición al dominio falla
+                const { data: fallbackData, error: prodError } = await supabase.from('products').select('*').order('name');
+                if (prodError) throw prodError;
+                productsData = fallbackData || [];
+            }
 
             // Fetch Purchases
             const { data: purchasesData, error: purchaseError } = await supabase.from('purchases').select('*').order('date', { ascending: false });
@@ -175,14 +196,8 @@ export const useStore = create<AppState>()(persist((set, get) => ({
                 items: p.items || []
             }));
 
-
             // Map DB snake_case to Frontend camelCase with strict casting
-            const products: Product[] = (productsData || []).map((p: any) => ({
-                ...p,
-                minStock: p.min_stock || 0,
-                isSale: Boolean(p.is_sale),
-                discountPrice: Number(p.discount_price) || 0
-            }));
+            const products: Product[] = (productsData || []).map(mapProductData);
 
             // Fetch Sales
             const { data: salesData, error: salesError } = await supabase.from('sales').select('*');
@@ -285,7 +300,26 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         }
     },
 
-    setProducts: (products) => set({ products }),
+    obtenerProductos: async () => {
+        try {
+            // AHORA LLAMAS A TU PROPIO DOMINIO:
+            const respuesta = await fetch('https://www.systecfl.site/api/productos');
+            if (!respuesta.ok) {
+                throw new Error(`Error en la petición: ${respuesta.status} ${respuesta.statusText}`);
+            }
+
+            // Conviertes a JSON
+            const data = await respuesta.json();
+
+            // Guardas los productos para mostrarlos en pantalla
+            get().setProductos(data);
+        } catch (error) {
+            console.error("Error cargando el catálogo:", error);
+        }
+    },
+
+    setProducts: (products) => set({ products: (products || []).map(mapProductData) }),
+    setProductos: (products) => set({ products: (products || []).map(mapProductData) }),
 
     addProduct: async (product) => {
         // Prepare DB object (map camelCase to snake_case)
