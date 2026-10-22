@@ -14,6 +14,9 @@ export interface Env {
     IMAGES: R2Bucket;          // bucket R2 para imágenes de productos
     RESEND_API_KEY?: string;   // opcional: para enviar el código de recuperación por correo
     MAIL_FROM?: string;        // opcional: remitente, ej. "SYSTEC <no-reply@systecfl.site>"
+    TURNSTILE_SITE_KEY?: string;   // pública: clave del widget de Turnstile (vars)
+    TURNSTILE_SECRET_KEY?: string; // secreto: valida los tokens de Turnstile en el servidor
+    DEV_LOG_CODES?: string;        // solo en .dev.vars: "true" muestra el código en la consola si no hay Resend
 }
 
 type Sql = NeonQueryFunction<false, false>;
@@ -85,6 +88,65 @@ async function body<T = any>(req: Request): Promise<T> {
     try { return (await req.json()) as T; } catch { throw new HttpError(400, 'JSON inválido'); }
 }
 
+// ---------- Turnstile (anti-bots) ----------
+
+/** Valida en el servidor el token del widget de Turnstile. Falla cerrado si no está configurado. */
+async function verifyTurnstile(req: Request, env: Env, token: unknown, action: string) {
+    if (!env.TURNSTILE_SECRET_KEY) throw new HttpError(503, 'La verificación anti-bots no está configurada');
+    if (typeof token !== 'string' || !token || token.length > 2048) {
+        throw new HttpError(400, 'Completa la verificación de seguridad');
+    }
+    const form = new FormData();
+    form.append('secret', env.TURNSTILE_SECRET_KEY);
+    form.append('response', token);
+    const ip = req.headers.get('CF-Connecting-IP');
+    if (ip) form.append('remoteip', ip);
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });
+    const data = (await r.json().catch(() => null)) as { success?: boolean; action?: string; 'error-codes'?: string[] } | null;
+    // Las claves de prueba de Turnstile no devuelven action; con claves reales debe coincidir con el formulario
+    if (!data?.success || (data.action && data.action !== action)) {
+        if (data?.['error-codes']?.length) console.warn('Turnstile rechazado', data['error-codes']);
+        throw new HttpError(403, 'La verificación de seguridad falló o expiró. Inténtalo de nuevo');
+    }
+}
+
+// ---------- Recuperación de contraseña ----------
+
+const RESET_CODE_MINUTES = 15;   // vigencia del código enviado por correo
+const RESET_MAX_ATTEMPTS = 5;    // intentos fallidos antes de invalidar el código
+const RESET_RESEND_SECONDS = 60; // espera mínima entre dos códigos para el mismo correo
+const RESET_TOKEN_TTL = 10 * 60; // tiempo para poner la nueva contraseña tras validar el código
+
+const escapeHtml = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/** Envía el código por correo con Resend. En local (DEV_LOG_CODES) lo muestra en la consola. */
+async function sendResetCode(env: Env, to: string, name: string, code: string) {
+    if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
+        if (env.DEV_LOG_CODES === 'true') { console.log(`[DEV] Código de recuperación para ${to}: ${code}`); return; }
+        throw new HttpError(503, 'El envío de correos no está configurado. Contacta al administrador.');
+    }
+    const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            from: env.MAIL_FROM,
+            to,
+            subject: `${code} es tu código para restablecer la contraseña - SYSTEC`,
+            html: `<p>Hola ${escapeHtml(name)},</p>
+                   <p>Tu código para restablecer la contraseña es:</p>
+                   <p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p>
+                   <p>Vence en ${RESET_CODE_MINUTES} minutos y solo se puede usar una vez.
+                   Si no lo pediste, ignora este correo: tu contraseña no cambiará.</p>`,
+            text: `Hola ${name}, tu código para restablecer la contraseña es ${code}. Vence en ${RESET_CODE_MINUTES} minutos.`,
+        }),
+    });
+    if (!r.ok) {
+        console.error('Resend error', r.status, await r.text());
+        throw new HttpError(502, 'No se pudo enviar el correo. Inténtalo de nuevo en unos minutos.');
+    }
+}
+
 // ---------- Router ----------
 
 export default {
@@ -106,6 +168,13 @@ export default {
                 headers.set('etag', obj.httpEtag);
                 headers.set('Cache-Control', 'public, max-age=31536000, immutable');
                 return new Response(obj.body, { headers });
+            }
+
+            // Configuración pública para el frontend (la site key de Turnstile no es secreta)
+            if (path === '/api/config' && method === 'GET') {
+                return json({ turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? null }, {
+                    headers: { 'Cache-Control': 'public, max-age=300' },
+                });
             }
 
             const sql = neon(env.DATABASE_URL);
@@ -242,7 +311,8 @@ export default {
             }
 
             if (path === '/api/auth/login' && method === 'POST') {
-                const { email, password } = await body(req);
+                const { email, password, turnstileToken } = await body(req);
+                await verifyTurnstile(req, env, turnstileToken, 'login');
                 const rows = (await sql`select * from users where lower(email) = lower(${String(email || '')})`) as DbUser[];
                 const user = rows[0];
                 if (!user || !(await verifyPassword(String(password || ''), user.password))) {
@@ -261,10 +331,11 @@ export default {
             }
 
             if (path === '/api/auth/register' && method === 'POST') {
-                const { name, email, password } = await body(req);
+                const { name, email, password, turnstileToken } = await body(req);
                 if (!name || !email || !password || String(password).length < 6) {
                     throw new HttpError(400, 'Datos incompletos (la contraseña debe tener al menos 6 caracteres)');
                 }
+                await verifyTurnstile(req, env, turnstileToken, 'register');
                 const exists = await sql`select 1 from users where lower(email) = lower(${email})`;
                 if (exists.length) throw new HttpError(409, 'Ya existe una cuenta con este correo');
                 const rows = (await sql`
@@ -274,47 +345,75 @@ export default {
                 return json({ user: mapUser(rows[0]) }, { status: 201 });
             }
 
-            // Recuperación de contraseña: paso 1, enviar código al correo
+            // Recuperación de contraseña, paso 1: comprobar que el correo existe y enviar un código de 6 dígitos
             if (path === '/api/auth/forgot' && method === 'POST') {
-                const { email } = await body(req);
-                const rows = (await sql`select * from users where lower(email) = lower(${String(email || '')})`) as DbUser[];
-                if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
-                    throw new HttpError(503, 'El envío de correos no está configurado. Contacta al administrador.');
+                const { email, turnstileToken } = await body(req);
+                await verifyTurnstile(req, env, turnstileToken, 'forgot');
+                const rows = (await sql`select * from users where lower(email) = lower(${String(email || '').trim()})`) as DbUser[];
+                const user = rows[0];
+                if (!user) throw new HttpError(404, 'No existe una cuenta registrada con este correo');
+
+                const recent = await sql`
+                    select 1 from password_resets
+                    where lower(email) = lower(${user.email}) and created_at > now() - make_interval(secs => ${RESET_RESEND_SECONDS})`;
+                if (recent.length) throw new HttpError(429, 'Ya te enviamos un código. Espera un minuto antes de pedir otro.');
+
+                // Solo el último código es válido: se invalidan los anteriores
+                const code = randomCode();
+                const inserted = await sql.transaction([
+                    sql`update password_resets set used = true where lower(email) = lower(${user.email}) and used = false`,
+                    sql`insert into password_resets (email, code_hash, expires_at)
+                        values (${user.email}, ${await sha256Hex(code)}, now() + make_interval(mins => ${RESET_CODE_MINUTES}))
+                        returning id`,
+                ]);
+                try {
+                    await sendResetCode(env, user.email, user.name, code);
+                } catch (err) {
+                    await sql`delete from password_resets where id = ${(inserted[1] as { id: string }[])[0].id}`;
+                    throw err;
                 }
-                // Respondemos igual exista o no el correo, para no revelar qué cuentas existen
-                if (rows[0]) {
-                    const code = randomCode();
-                    await sql`insert into password_resets (email, code_hash, expires_at)
-                              values (${rows[0].email}, ${await sha256Hex(code)}, now() + interval '15 minutes')`;
-                    const r = await fetch('https://api.resend.com/emails', {
-                        method: 'POST',
-                        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            from: env.MAIL_FROM,
-                            to: rows[0].email,
-                            subject: 'Tu código para restablecer la contraseña - SYSTEC',
-                            html: `<p>Hola ${rows[0].name},</p><p>Tu código es: <b style="font-size:20px">${code}</b></p><p>Vence en 15 minutos. Si no lo pediste, ignora este correo.</p>`,
-                        }),
-                    });
-                    if (!r.ok) console.error('Resend error', r.status, await r.text());
-                }
-                return json({ ok: true });
+                return json({ ok: true, expiresInMinutes: RESET_CODE_MINUTES });
             }
 
-            // Recuperación de contraseña: paso 2, validar código y guardar nueva contraseña
-            if (path === '/api/auth/reset' && method === 'POST') {
-                const { email, code, password } = await body(req);
-                if (!password || String(password).length < 6) throw new HttpError(400, 'La contraseña debe tener al menos 6 caracteres');
+            // Recuperación de contraseña, paso 2: validar el código y entregar un permiso temporal para cambiar la contraseña
+            if (path === '/api/auth/verify-code' && method === 'POST') {
+                const { email, code, turnstileToken } = await body(req);
+                await verifyTurnstile(req, env, turnstileToken, 'verify');
                 const rows = await sql`
-                    select id from password_resets
-                    where lower(email) = lower(${String(email || '')}) and code_hash = ${await sha256Hex(String(code || ''))}
-                      and used = false and expires_at > now()
+                    select id, code_hash, attempts from password_resets
+                    where lower(email) = lower(${String(email || '').trim()}) and used = false and expires_at > now()
                     order by created_at desc limit 1`;
-                if (!rows[0]) throw new HttpError(400, 'El código es inválido o ha expirado');
-                await sql.transaction([
-                    sql`update password_resets set used = true where id = ${rows[0].id}`,
-                    sql`update users set password = ${await hashPassword(password)} where lower(email) = lower(${email})`,
-                ]);
+                const reset = rows[0] as { id: string; code_hash: string; attempts: number } | undefined;
+                if (!reset) throw new HttpError(400, 'El código expiró o ya fue usado. Solicita uno nuevo.');
+
+                if (reset.code_hash !== (await sha256Hex(String(code || '').trim()))) {
+                    const left = RESET_MAX_ATTEMPTS - (reset.attempts + 1);
+                    await sql`update password_resets set attempts = attempts + 1, used = ${left <= 0} where id = ${reset.id}`;
+                    if (left <= 0) throw new HttpError(429, 'Demasiados intentos fallidos. Solicita un código nuevo.');
+                    throw new HttpError(400, `Código incorrecto. ${left === 1 ? 'Te queda 1 intento' : `Te quedan ${left} intentos`}.`);
+                }
+                await sql`update password_resets set verified_at = now() where id = ${reset.id}`;
+                const resetToken = await signJwt({ sub: String(reset.id), purpose: 'password-reset' }, env.JWT_SECRET, RESET_TOKEN_TTL);
+                return json({ resetToken });
+            }
+
+            // Recuperación de contraseña, paso 3: guardar la nueva contraseña (requiere el permiso del paso 2)
+            if (path === '/api/auth/reset' && method === 'POST') {
+                const { resetToken, password } = await body(req);
+                if (!password || String(password).length < 6) throw new HttpError(400, 'La contraseña debe tener al menos 6 caracteres');
+                const payload = await verifyJwt<{ sub: string; purpose: string }>(String(resetToken || ''), env.JWT_SECRET);
+                if (payload?.purpose !== 'password-reset') throw new HttpError(400, 'La verificación expiró. Vuelve a solicitar un código.');
+                // Una sola sentencia: marca el permiso como usado (used = false en el WHERE => solo sirve una vez) y cambia la contraseña
+                const done = await sql`
+                    with r as (
+                        update password_resets set used = true
+                        where id = ${payload.sub} and used = false and verified_at is not null
+                        returning email
+                    )
+                    update users set password = ${await hashPassword(String(password))}
+                    where lower(email) = (select lower(email) from r)
+                    returning id`;
+                if (!done[0]) throw new HttpError(400, 'La verificación expiró o ya fue usada. Vuelve a solicitar un código.');
                 return json({ ok: true });
             }
 

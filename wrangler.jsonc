@@ -26,10 +26,13 @@
 
   // Variables NO secretas
   "vars": {
-    "MAIL_FROM": "SYSTEC <no-reply@systecfl.site>"
+    "MAIL_FROM": "SYSTEC <no-reply@systecfl.site>",
+    // Site key pública del widget de Turnstile "SYSTEC auth" (systecfl.site y www). En local se usa la de prueba de .dev.vars
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFgQEzgrh2W8VHJp"
   }
-  // Secretos (NO van aquí): DATABASE_URL, JWT_SECRET, RESEND_API_KEY
+  // Secretos (NO van aquí): DATABASE_URL, JWT_SECRET, TURNSTILE_SECRET_KEY, RESEND_API_KEY
   //   npx wrangler secret put DATABASE_URL
   //   npx wrangler secret put JWT_SECRET
-  //   npx wrangler secret put RESEND_API_KEY   (opcional, para recuperar contraseña)
+  //   npx wrangler secret put TURNSTILE_SECRET_KEY
+  //   npx wrangler secret put RESEND_API_KEY   (para enviar el código de recuperación de contraseña)
 }

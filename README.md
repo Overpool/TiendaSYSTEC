@@ -94,9 +94,15 @@ npx wrangler r2 bucket create systec-images # bucket para las imágenes
 ### 5. Guardar los secretos en Cloudflare
 
 ```bash
-npx wrangler secret put DATABASE_URL   # pega la cadena de Neon
-npx wrangler secret put JWT_SECRET     # pega una cadena aleatoria larga (distinta a la de local)
+npx wrangler secret put DATABASE_URL          # pega la cadena de Neon
+npx wrangler secret put JWT_SECRET            # pega una cadena aleatoria larga (distinta a la de local)
+npx wrangler secret put TURNSTILE_SECRET_KEY  # clave secreta del widget de Turnstile
 ```
+
+**Turnstile (anti-bots)** protege el login, el registro y la recuperación de contraseña. Crea un widget en
+Cloudflare → **Turnstile** con los dominios `systecfl.site` y `www.systecfl.site`, pon su *site key* (pública) en
+`wrangler.jsonc` → `vars.TURNSTILE_SITE_KEY` y guarda la *secret key* con el comando de arriba. En local,
+`.dev.vars.example` trae las claves de prueba oficiales de Cloudflare, que siempre aprueban.
 
 ### 6. Mover el dominio de Vercel a Cloudflare
 
@@ -133,7 +139,7 @@ Descarga cada imagen de Supabase, la sube a R2 y actualiza la URL en `products.i
 ### 8. (Recomendado) Recuperación de contraseña por correo
 
 1. Crea una cuenta gratuita en <https://resend.com> y agrega el dominio `systecfl.site`.
-   Resend te da registros DNS (TXT/MX); agrégalos en Cloudflare → DNS.
+   Resend te da registros DNS (DKIM, SPF y DMARC); agrégalos en Cloudflare → DNS (o usa *Auto configure*).
 2. Crea una API key y guárdala:
 
    ```bash
@@ -141,9 +147,15 @@ Descarga cada imagen de Supabase, la sube a R2 y actualiza la URL en `products.i
    ```
 
 3. El remitente se configura en `wrangler.jsonc` → `vars.MAIL_FROM`.
+4. En bases creadas antes de este cambio, ejecuta una vez `neon/migrations/001_password_resets_verificacion.sql`.
 
-Sin este paso, "¿Olvidaste tu contraseña?" muestra un mensaje pidiendo contactar al administrador
-(el admin puede cambiar contraseñas desde **Usuarios**).
+El flujo tiene 3 pasos: (1) el usuario escribe su correo y, si existe una cuenta, recibe un código de 6 dígitos
+válido 15 minutos (solo el último código es válido y hay que esperar 1 minuto para pedir otro); (2) escribe el
+código, con un máximo de 5 intentos; (3) crea su nueva contraseña con un permiso de un solo uso válido 10 minutos.
+
+Sin Resend, "¿Olvidaste tu contraseña?" muestra un mensaje pidiendo contactar al administrador
+(el admin puede cambiar contraseñas desde **Usuarios**). En local, con `DEV_LOG_CODES="true"` en `.dev.vars`,
+el código aparece en la consola de `npm run dev` en lugar de enviarse por correo.
 
 ### 9. Despliegue automático desde GitHub (opcional)
 
@@ -187,6 +199,8 @@ Cuando todo funcione unos días:
 | `GET/POST /api/purchases` | Admin o empleado con *Inventario* |
 | `GET/POST /api/users`, `DELETE /api/users/:id` | Admin o empleado con *Usuarios* |
 | `PATCH /api/users/:id` | El propio usuario (perfil) o quien tenga *Usuarios* |
-| `POST /api/auth/login`, `/register`, `/logout`, `/forgot`, `/reset`; `GET /api/auth/me` | Público |
+| `POST /api/auth/login`, `/register`, `/forgot`, `/verify-code` | Público, con token de Turnstile |
+| `POST /api/auth/reset` | Público, con el permiso que entrega `/verify-code` |
+| `POST /api/auth/logout`; `GET /api/auth/me`, `GET /api/config` | Público |
 | `PUT /api/me/wishlist` | Usuario con sesión |
 | `GET /api/images/*` | Público (imágenes en R2) |

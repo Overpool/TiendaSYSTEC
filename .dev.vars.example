@@ -3,3 +3,9 @@ DATABASE_URL="postgresql://usuario:password@ep-xxxx-pooler.us-east-1.aws.neon.te
 JWT_SECRET="cambia-esto-por-una-cadena-aleatoria-larga"
 # Opcional: para enviar el código de recuperación de contraseña
 # RESEND_API_KEY="re_xxxxxxxx"
+
+# Turnstile: claves de PRUEBA oficiales de Cloudflare (siempre aprueban). En produccion la site key va en wrangler.jsonc y la secreta con wrangler secret put
+TURNSTILE_SITE_KEY="1x00000000000000000000AA"
+TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
+# Solo local: muestra el codigo de recuperacion en la consola si no hay RESEND_API_KEY
+DEV_LOG_CODES="true"
