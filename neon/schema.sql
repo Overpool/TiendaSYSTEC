@@ -57,12 +57,14 @@ create table if not exists users (
 
 -- Códigos de recuperación de contraseña (se guarda solo el hash del código)
 create table if not exists password_resets (
-  id         bigint generated always as identity primary key,
-  email      text not null,
-  code_hash  text not null,
-  expires_at timestamptz not null,
-  used       boolean not null default false,
-  created_at timestamptz not null default now()
+  id          bigint generated always as identity primary key,
+  email       text not null,
+  code_hash   text not null,
+  expires_at  timestamptz not null,
+  used        boolean not null default false,
+  attempts    integer not null default 0,  -- intentos fallidos (se invalida al llegar a 5)
+  verified_at timestamptz,                 -- momento en que se validó el código
+  created_at  timestamptz not null default now()
 );
 
 create index if not exists products_name_idx     on products (name);

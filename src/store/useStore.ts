@@ -44,11 +44,12 @@ interface AppState {
     addSale: (sale: Sale) => Promise<void>;
 
     // Auth Actions
-    login: (email: string, password: string) => Promise<boolean>;
-    register: (user: Omit<User, 'id' | 'createdAt' | 'role'>) => Promise<void>;
+    login: (email: string, password: string, turnstileToken: string) => Promise<boolean>;
+    register: (user: Omit<User, 'id' | 'createdAt' | 'role'>, turnstileToken: string) => Promise<void>;
     logout: () => void;
-    requestPasswordReset: (email: string) => Promise<void>;
-    resetPassword: (email: string, code: string, password: string) => Promise<void>;
+    requestPasswordReset: (email: string, turnstileToken: string) => Promise<void>;
+    verifyResetCode: (email: string, code: string, turnstileToken: string) => Promise<string>;
+    resetPassword: (resetToken: string, password: string) => Promise<void>;
 
     // User Management Actions
     addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
@@ -292,24 +293,26 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         }
     },
 
-    login: async (email, password) => {
+    login: async (email, password, turnstileToken) => {
         try {
-            const { user } = await api.post<{ user: User }>('/auth/login', { email, password });
+            const { user } = await api.post<{ user: User }>('/auth/login', { email, password, turnstileToken });
             set({ currentUser: user });
             // Cargar datos de administración si corresponde
             get().loadInitialData();
             return true;
         } catch (error: any) {
-            if (error.status !== 401) console.error('Error en login:', error.message);
-            return false;
+            // 401 = credenciales inválidas; cualquier otro error (p. ej. Turnstile) se muestra con su mensaje
+            if (error.status === 401) return false;
+            throw error;
         }
     },
 
-    register: async (userData) => {
+    register: async (userData, turnstileToken) => {
         await api.post('/auth/register', {
             name: userData.name,
             email: userData.email,
             password: userData.password,
+            turnstileToken,
         });
     },
 
@@ -318,12 +321,17 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         set({ currentUser: null, sales: [], purchases: [], users: [] });
     },
 
-    requestPasswordReset: async (email) => {
-        await api.post('/auth/forgot', { email });
+    requestPasswordReset: async (email, turnstileToken) => {
+        await api.post('/auth/forgot', { email, turnstileToken });
     },
 
-    resetPassword: async (email, code, password) => {
-        await api.post('/auth/reset', { email, code, password });
+    verifyResetCode: async (email, code, turnstileToken) => {
+        const { resetToken } = await api.post<{ resetToken: string }>('/auth/verify-code', { email, code, turnstileToken });
+        return resetToken;
+    },
+
+    resetPassword: async (resetToken, password) => {
+        await api.post('/auth/reset', { resetToken, password });
     },
 
     addUser: async (userData) => {
