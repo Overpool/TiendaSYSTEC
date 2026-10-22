@@ -65,7 +65,12 @@ export const Purchases = () => {
             items: purchaseItems
         };
 
-        await addPurchase(newPurchase);
+        try {
+            await addPurchase(newPurchase);
+        } catch (error: any) {
+            Swal.fire('Error', error?.message || 'No se pudo registrar la compra', 'error');
+            return;
+        }
 
         Swal.fire({
             icon: 'success',

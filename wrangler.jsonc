@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tienda-systec",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "upload_source_maps": true,
+  "observability": { "enabled": true },
+
+  // Frontend React como SPA; todo lo que empiece con /api/ lo atiende el Worker
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Bucket R2 para las imágenes de productos (créalo con: npx wrangler r2 bucket create systec-images)
+  "r2_buckets": [
+    { "binding": "IMAGES", "bucket_name": "systec-images" }
+  ],
+
+  // Tu dominio (ya está en Cloudflare). Wrangler crea los registros DNS automáticamente.
+  "routes": [
+    { "pattern": "www.systecfl.site", "custom_domain": true },
+    { "pattern": "systecfl.site", "custom_domain": true }
+  ],
+
+  // Variables NO secretas
+  "vars": {
+    "MAIL_FROM": "SYSTEC <no-reply@systecfl.site>"
+  }
+  // Secretos (NO van aquí): DATABASE_URL, JWT_SECRET, RESEND_API_KEY
+  //   npx wrangler secret put DATABASE_URL
+  //   npx wrangler secret put JWT_SECRET
+  //   npx wrangler secret put RESEND_API_KEY   (opcional, para recuperar contraseña)
+}

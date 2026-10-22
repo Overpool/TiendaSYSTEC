@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { Product } from '../../types';
 import { Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
 import Swal from 'sweetalert2';
 import { useStore } from '../../store/useStore';
 
@@ -58,26 +58,15 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
         }
 
         const file = e.target.files[0];
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
         setIsUploading(true);
 
         try {
-            const { error: uploadError } = await supabase.storage
-                .from('products')
-                .upload(filePath, file);
+            // Sube la imagen al bucket R2 a través del Worker
+            const formDataUpload = new FormData();
+            formDataUpload.append('file', file);
+            const data = await api.post<{ url: string }>('/upload', formDataUpload);
 
-            if (uploadError) {
-                throw uploadError;
-            }
-
-            const { data } = supabase.storage
-                .from('products')
-                .getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, image: data.publicUrl }));
+            setFormData(prev => ({ ...prev, image: data.url }));
             Swal.fire({
                 icon: 'success',
                 title: 'Imagen subida',
@@ -91,7 +80,7 @@ export const ProductForm = ({ initialData, onSubmit, onCancel }: ProductFormProp
             Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'No se pudo subir la imagen. Asegúrate de haber creado el bucket "products" y que sea público.',
+                text: error?.message || 'No se pudo subir la imagen.',
             });
         } finally {
             setIsUploading(false);

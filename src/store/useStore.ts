@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 import type { Product, CartItem, Sale, User, Purchase } from '../types';
 
 interface AppState {
@@ -47,6 +47,8 @@ interface AppState {
     login: (email: string, password: string) => Promise<boolean>;
     register: (user: Omit<User, 'id' | 'createdAt' | 'role'>) => Promise<void>;
     logout: () => void;
+    requestPasswordReset: (email: string) => Promise<void>;
+    resetPassword: (email: string, code: string, password: string) => Promise<void>;
 
     // User Management Actions
     addUser: (user: Omit<User, 'id' | 'createdAt'>) => Promise<void>;
@@ -70,81 +72,22 @@ interface AppState {
     toggleWishlist: (productId: string) => Promise<void>;
 }
 
-// Initial Mock Data (For Seeding)
-const initialProducts: Product[] = [
-    {
-        id: '1',
-        name: 'Smart Watch Series 8',
-        brand: 'Apple Clone',
-        category: 'Electronics',
-        price: 45.99,
-        cost: 20.00,
-        stock: 100,
-        minStock: 10,
-        description: 'Latest smart watch with health tracking',
-        image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&q=80',
-        isSale: true,
-        discountPrice: 29.99
-    },
-    {
-        id: '2',
-        name: 'Wireless Earbuds Pro',
-        brand: 'AudioTechnica',
-        category: 'Electronics',
-        price: 25.50,
-        cost: 10.00,
-        stock: 50,
-        minStock: 10,
-        description: 'Noise cancelling earbuds',
-        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&q=80',
-        isSale: false
-    },
-    {
-        id: '3',
-        name: 'Fashion Summer Dress',
-        brand: 'Zara',
-        category: 'Clothing',
-        price: 15.99,
-        cost: 5.00,
-        stock: 200,
-        minStock: 10,
-        description: 'Floral print summer dress',
-        image: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=500&q=80',
-        isSale: true
-    },
-    {
-        id: '4',
-        name: 'Gaming Mechanical Keyboard',
-        brand: 'Logitech',
-        category: 'Electronics',
-        price: 55.00,
-        cost: 30.00,
-        stock: 15,
-        minStock: 5,
-        description: 'RGB Backlit mechanical keyboard',
-        image: 'https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=500&q=80',
-        isSale: false
-    }
-];
-
-const initialUsers: User[] = [
-    {
-        id: '1',
-        name: 'Admin User',
-        email: 'admin@aliexpress.com',
-        password: 'admin123',
-        role: 'admin',
-        permissions: ['inventory', 'pos', 'sales', 'users'],
-        createdAt: new Date().toISOString()
-    }
-];
-
 const mapProductData = (p: any): Product => ({
     ...p,
-    minStock: p.minStock ?? p.min_stock ?? 0,
+    price: Number(p.price) || 0,
+    cost: Number(p.cost) || 0,
+    stock: Number(p.stock) || 0,
+    minStock: Number(p.minStock ?? p.min_stock ?? 0),
     isSale: Boolean(p.isSale ?? p.is_sale),
     discountPrice: Number(p.discountPrice ?? p.discount_price) || 0
 });
+
+const canAccess = (user: User | null, perm?: string) => {
+    if (!user) return false;
+    if (user.role === 'admin') return true;
+    if (user.role !== 'employee') return false;
+    return !perm || (user.permissions || []).includes(perm);
+};
 
 export const useStore = create<AppState>()(persist((set, get) => ({
     products: [],
@@ -164,137 +107,35 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     setSearchQuery: (query) => set({ searchQuery: query }),
     setSelectedCategory: (category) => set({ selectedCategory: category }),
     setSelectedBrand: (brand) => set({ selectedBrand: brand }),
+
     loadInitialData: async () => {
         set({ isLoading: true, error: null });
         try {
-            // Fetch Products desde el dominio propio (aprovechando caché)
-            let productsData: any[] = [];
-            try {
-                const respuesta = await fetch('https://www.systecfl.site/api/productos');
-                if (!respuesta.ok) {
-                    throw new Error(`Error en la respuesta del catálogo: ${respuesta.status} ${respuesta.statusText}`);
-                }
-                productsData = await respuesta.json();
-            } catch (catalogError) {
-                console.error("Error cargando el catálogo desde la API:", catalogError);
-                // Fallback a Supabase si la petición al dominio falla
-                const { data: fallbackData, error: prodError } = await supabase.from('products').select('*').order('name');
-                if (prodError) throw prodError;
-                productsData = fallbackData || [];
-            }
+            // Catálogo público + sesión actual (cookie HttpOnly) en paralelo
+            const [productsData, session] = await Promise.all([
+                api.get<any[]>('/productos'),
+                api.get<{ user: User | null }>('/auth/me').catch(() => ({ user: null })),
+            ]);
+            set({ products: (productsData || []).map(mapProductData) });
 
-            // Fetch Purchases
-            const { data: purchasesData, error: purchaseError } = await supabase.from('purchases').select('*').order('date', { ascending: false });
-            if (purchaseError && purchaseError.code !== '42P01') { // Ignore if table doesn't exist yet
-                console.error("Error fetching purchases", purchaseError);
-            }
-            const purchases: Purchase[] = (purchasesData || []).map((p: any) => ({
-                id: p.id,
-                supplier: p.supplier,
-                date: p.date,
-                total: p.total,
-                items: p.items || []
-            }));
+            // Si la cookie expiró o no existe, cerramos la sesión local
+            const me = session.user;
+            set({ currentUser: me });
 
-            // Map DB snake_case to Frontend camelCase with strict casting
-            const products: Product[] = (productsData || []).map(mapProductData);
-
-            // Fetch Sales
-            const { data: salesData, error: salesError } = await supabase.from('sales').select('*');
-            if (salesError) throw salesError;
-
-            const sales: Sale[] = (salesData || []).map((s: any) => ({
-                ...s,
-                paymentMethod: s.payment_method,
-                userId: s.user_id
-            }));
-
-            // Fetch Users
-            const { data: usersData, error: usersError } = await supabase.from('users').select('*');
-            if (usersError) throw usersError;
-
-            const users: User[] = (usersData || []).map((u: any) => ({
-                ...u,
-                createdAt: u.created_at,
-                wishlist: u.wishlist || [],
-                dni: u.dni,
-                phone: u.phone,
-                address: u.address,
-                city: u.city,
-                zipCode: u.zip_code,
-                country: u.country
-            }));
-
-            // FIX: Prevent overwriting local currentUser with stale/incomplete DB data
-            const currentUser = get().currentUser;
-            if (currentUser) {
-                const refreshedUser = users.find(u => u.id === currentUser.id);
-                if (refreshedUser) {
-                    // Merge: Keep local optimistic updates if DB is lagging, but update confirmed changes
-                    // For now, valid strategy is to trust local for wishlist if DB is empty but local has items (edge case)
-                    // Better: Trust DB but if DB has nulls where local has values (e.g. recent edit), keep local? 
-                    // Simpler: Just refresh currentUser with the latest from DB, 
-                    // BUT if we just saved something, local might be ahead. 
-
-                    // Actually, the issue is likely that 'wishlist' was missing in previous fetch. 
-                    // Now it's mapped.
-
-                    // Logic: If we have a current user, update them with the fresh data from the list
-                    // to ensure they see changes from other devices/sessions, 
-                    // BUT if the DB returns null for new fields (schema update not applied in real DB), 
-                    // we might want to keep local if we just edited it? 
-                    // For "reversion" bug, usually it's because the UI updates state, then this background fetch 
-                    // finishes and clobbers it with old data.
-
-                    // We will update currentUser, but we can verify if the new data is actually "newer" or "different".
-                    // For this fix, let's just update it so the UI reflects the true backend state,
-                    // which is correct behavior. The "swapping back" happens if the backend UPDATE failed.
-
-                    set({ currentUser: refreshedUser });
-                }
-            }
-
-            // Seed if empty
-            if ((!products || products.length === 0) && (!users || users.length === 0)) {
-                console.log('Seeding initial data...');
-                // Seed Products - removing IDs to let DB generate UUIDs
-                const productsToInsert = initialProducts.map(({ id, ...rest }) => rest);
-                const { data: newProds, error: seedError } = await supabase.from('products').insert(productsToInsert).select();
-
-                const usersToInsert = initialUsers.map(({ id, ...rest }) => rest);
-                const { data: newUsers, error: seedUserError } = await supabase.from('users').insert(usersToInsert).select();
-
-                if (seedError) console.error("Seed error products", seedError);
-                if (seedUserError) console.error("Seed error users", seedUserError);
-
-                if (newProds) {
-                    const mappedProds = newProds.map((p: any) => ({
-                        ...p,
-                        isSale: Boolean(p.is_sale),
-                        discountPrice: Number(p.discount_price) || 0
-                    }));
-                    set({ products: mappedProds });
-                }
-                if (newUsers) {
-                    const mappedUsers = newUsers.map((u: any) => ({
-                        ...u,
-                        createdAt: u.created_at
-                    }));
-                    set({ users: mappedUsers });
-                }
-            } else {
-                set({
-                    products: products || [],
-                    sales: sales || [],
-                    purchases: purchases || [],
-                    users: users || []
-                });
-            }
-
+            // Datos privados: solo se piden si el usuario tiene permiso
+            const [salesRes, purchasesRes, usersRes] = await Promise.allSettled([
+                canAccess(me) ? api.get<Sale[]>('/sales') : Promise.resolve([] as Sale[]),
+                canAccess(me, 'inventory') ? api.get<Purchase[]>('/purchases') : Promise.resolve([] as Purchase[]),
+                canAccess(me, 'users') ? api.get<User[]>('/users') : Promise.resolve([] as User[]),
+            ]);
+            set({
+                sales: salesRes.status === 'fulfilled' ? salesRes.value : [],
+                purchases: purchasesRes.status === 'fulfilled' ? purchasesRes.value : [],
+                users: usersRes.status === 'fulfilled' ? usersRes.value : [],
+            });
         } catch (error: any) {
             console.error('Error loading data:', error);
             set({ error: error.message });
-            set({ products: initialProducts, users: initialUsers });
         } finally {
             set({ isLoading: false });
         }
@@ -302,16 +143,7 @@ export const useStore = create<AppState>()(persist((set, get) => ({
 
     obtenerProductos: async () => {
         try {
-            // AHORA LLAMAS A TU PROPIO DOMINIO:
-            const respuesta = await fetch('https://www.systecfl.site/api/productos');
-            if (!respuesta.ok) {
-                throw new Error(`Error en la petición: ${respuesta.status} ${respuesta.statusText}`);
-            }
-
-            // Conviertes a JSON
-            const data = await respuesta.json();
-
-            // Guardas los productos para mostrarlos en pantalla
+            const data = await api.get<any[]>('/productos');
             get().setProductos(data);
         } catch (error) {
             console.error("Error cargando el catálogo:", error);
@@ -322,87 +154,40 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     setProductos: (products) => set({ products: (products || []).map(mapProductData) }),
 
     addProduct: async (product) => {
-        // Prepare DB object (map camelCase to snake_case)
-        const productToInsert = {
-            name: product.name,
-            code: product.code,
-            category: product.category,
-            brand: product.brand,
-            price: product.price,
-            cost: product.cost,
-            stock: product.stock,
-            min_stock: product.minStock ?? 0,
-            description: product.description,
-            image: product.image,
-            is_sale: product.isSale,
-            discount_price: product.discountPrice
-        };
-
-        let { data, error } = await supabase.from('products').insert([productToInsert]).select();
-
-        // If min_stock column doesn't exist yet, retry without it
-        if (error) {
+        try {
+            const created = mapProductData(await api.post<Product>('/products', product));
+            set((state) => ({ products: [...state.products, created] }));
+            return created;
+        } catch (error: any) {
             console.error('Error adding product:', error.message);
-            if (error.message.includes('min_stock') || error.code === 'PGRST204' || error.code === '42703') {
-                const { min_stock, ...insertWithoutMinStock } = productToInsert as any;
-                const retry = await supabase.from('products').insert([insertWithoutMinStock]).select();
-                data = retry.data;
-                error = retry.error;
-            }
-
-            if (error) {
-                console.error('Product insert failed definitively:', error.message);
-                return null;
-            }
+            return null;
         }
-
-        if (data && data.length > 0) {
-            const row = data[0];
-            const newProduct: Product = {
-                ...product,
-                id: row.id,
-                code: row.code,
-                stock: row.stock,
-                minStock: row.min_stock ?? product.minStock ?? 0,
-                isSale: Boolean(row.is_sale),
-                discountPrice: row.discount_price
-            };
-            set((state) => ({
-                products: [...state.products, newProduct]
-            }));
-            return newProduct;
-        }
-        return null;
     },
 
     updateProduct: async (id, updates) => {
+        const previous = get().products;
         set((state) => ({
             products: state.products.map((p) => (p.id === id ? { ...p, ...updates } : p)),
         }));
-
-        const dbUpdates: any = {};
-        if (updates.name !== undefined) dbUpdates.name = updates.name;
-        if (updates.code !== undefined) dbUpdates.code = updates.code;
-        if (updates.brand !== undefined) dbUpdates.brand = updates.brand;
-        if (updates.category !== undefined) dbUpdates.category = updates.category;
-        if (updates.price !== undefined) dbUpdates.price = updates.price;
-        if (updates.cost !== undefined) dbUpdates.cost = updates.cost;
-        if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
-        if (updates.description !== undefined) dbUpdates.description = updates.description;
-        if (updates.image !== undefined) dbUpdates.image = updates.image;
-        if (updates.isSale !== undefined) dbUpdates.is_sale = updates.isSale;
-        if (updates.discountPrice !== undefined) dbUpdates.discount_price = updates.discountPrice;
-
-        const { error } = await supabase.from('products').update(dbUpdates).eq('id', id);
-        if (error) console.error('Error updating product:', error.message);
+        try {
+            await api.patch(`/products/${id}`, updates);
+        } catch (error: any) {
+            console.error('Error updating product:', error.message);
+            set({ products: previous });
+        }
     },
 
     deleteProduct: async (id) => {
+        const previous = get().products;
         set((state) => ({
             products: state.products.filter((p) => p.id !== id),
         }));
-        const { error } = await supabase.from('products').delete().eq('id', id);
-        if (error) console.error('Error deleting product:', error);
+        try {
+            await api.del(`/products/${id}`);
+        } catch (error: any) {
+            console.error('Error deleting product:', error.message);
+            set({ products: previous });
+        }
     },
 
     // Cart (Local Only for now, commonly cart is session based or local)
@@ -461,185 +246,122 @@ export const useStore = create<AppState>()(persist((set, get) => ({
     clearPosCart: () => set({ posCart: [] }),
 
     addPurchase: async (purchase) => {
-        // 1. Optimistic Updates
+        // 1. Actualización optimista
         set((state) => ({
             purchases: [purchase, ...state.purchases],
             products: state.products.map(p => {
                 const item = purchase.items.find(i => i.id === p.id);
-                if (item) {
-                    return { ...p, stock: p.stock + item.quantity };
-                }
-                return p;
+                return item ? { ...p, stock: p.stock + item.quantity } : p;
             })
         }));
 
-        // 2. Database Persistence (Purchase Record)
-        const purchaseToInsert = {
-            id: purchase.id,
-            supplier: purchase.supplier,
-            date: purchase.date,
-            total: purchase.total,
-            items: purchase.items
-        };
-
-        const { error: purchaseError } = await supabase.from('purchases').insert([purchaseToInsert]);
-
-        if (purchaseError) {
-            console.error('Error adding purchase:', purchaseError.message);
-        }
-
-        // 3. Persist Stock changes to DB
-        const currentProducts = get().products;
-        for (const item of purchase.items) {
-            const product = currentProducts.find(p => p.id === item.id);
-            if (product) {
-                await supabase.from('products').update({ stock: product.stock }).eq('id', item.id);
-            }
+        // 2. El servidor guarda la compra y suma el stock en una sola transacción
+        try {
+            await api.post('/purchases', purchase);
+        } catch (error: any) {
+            console.error('Error adding purchase:', error.message);
+            await get().loadInitialData();
+            throw error;
         }
     },
 
     addSale: async (sale) => {
-        // 1. Optimistic Updates
+        // 1. Actualización optimista
         set((state) => ({
             sales: [sale, ...state.sales],
             products: state.products.map(p => {
                 const item = sale.items.find(i => i.id === p.id);
-                if (item) {
-                    return { ...p, stock: p.stock - item.quantity };
-                }
-                return p;
+                return item ? { ...p, stock: p.stock - item.quantity } : p;
             })
         }));
 
-        // 2. Database Persistence (Sale Record)
-        const saleToInsert = {
-            total: sale.total,
-            payment_method: sale.paymentMethod,
-            date: sale.date,
-            items: sale.items,
-            user_id: get().currentUser?.id
-        };
-
-        const { data, error } = await supabase.from('sales').insert([saleToInsert]).select();
-
-        if (error) {
-            console.error('Error adding sale:', error.message);
-        } else if (data) {
-            const newSale = {
-                ...sale,
-                id: data[0].id,
-                paymentMethod: data[0].payment_method
-            };
-            // Update optimistic ID
+        // 2. El servidor recalcula el total con precios reales y descuenta stock en una transacción
+        try {
+            const saved = await api.post<Sale>('/sales', {
+                items: sale.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity })),
+                paymentMethod: sale.paymentMethod,
+            });
             set((state) => ({
-                sales: state.sales.map(s => s.id === sale.id ? newSale : s)
+                sales: state.sales.map(s => s.id === sale.id ? saved : s)
             }));
-        }
-
-        // 3. Persist Stock changes to DB
-        const currentProducts = get().products;
-        for (const item of sale.items) {
-            const product = currentProducts.find(p => p.id === item.id);
-            if (product) {
-                await supabase.from('products').update({ stock: product.stock }).eq('id', item.id);
-            }
+        } catch (error: any) {
+            console.error('Error adding sale:', error.message);
+            set((state) => ({ sales: state.sales.filter(s => s.id !== sale.id) }));
+            get().obtenerProductos();
+            throw error;
         }
     },
 
     login: async (email, password) => {
-        const { data: usersData, error } = await supabase.from('users').select('*');
-        if (error) console.error('Error fetching users for login:', error.message);
-
-        const fetchedUsers = (usersData || []).map((u: any) => ({
-            ...u,
-            createdAt: u.created_at
-        }));
-
-        const user = fetchedUsers.find((u: User) => u.email === email && u.password === password);
-
-        if (user) {
+        try {
+            const { user } = await api.post<{ user: User }>('/auth/login', { email, password });
             set({ currentUser: user });
+            // Cargar datos de administración si corresponde
+            get().loadInitialData();
             return true;
+        } catch (error: any) {
+            if (error.status !== 401) console.error('Error en login:', error.message);
+            return false;
         }
-        return false;
     },
 
     register: async (userData) => {
-        const newId = Date.now().toString();
-        const newUser = { ...userData, id: newId, role: 'shopper', createdAt: new Date().toISOString() };
-
-        set((state) => ({ users: [...state.users, newUser as any] }));
-
-        const userToInsert = {
-            id: newId,
+        await api.post('/auth/register', {
             name: userData.name,
             email: userData.email,
             password: userData.password,
-            role: 'shopper',
-            created_at: newUser.createdAt
-        };
-
-        const { error } = await supabase.from('users').insert([userToInsert]);
-        if (error) console.error('Error registering:', error.message);
+        });
     },
 
-    logout: () => set({ currentUser: null }),
+    logout: () => {
+        api.post('/auth/logout').catch(() => { });
+        set({ currentUser: null, sales: [], purchases: [], users: [] });
+    },
+
+    requestPasswordReset: async (email) => {
+        await api.post('/auth/forgot', { email });
+    },
+
+    resetPassword: async (email, code, password) => {
+        await api.post('/auth/reset', { email, code, password });
+    },
 
     addUser: async (userData) => {
-        const newId = Date.now().toString();
-        const newUser = { ...userData, id: newId, createdAt: new Date().toISOString() };
-
-        set((state) => ({ users: [...state.users, newUser as any] }));
-
-        const userToInsert = {
-            id: newId,
-            name: userData.name,
-            email: userData.email,
-            password: userData.password,
-            role: userData.role,
-            permissions: userData.permissions,
-            created_at: newUser.createdAt
-        };
-
-        const { error } = await supabase.from('users').insert([userToInsert]);
-        if (error) console.error('Error adding user:', error.message);
+        try {
+            const created = await api.post<User>('/users', userData);
+            set((state) => ({ users: [...state.users, created] }));
+        } catch (error: any) {
+            console.error('Error adding user:', error.message);
+            throw error;
+        }
     },
 
     updateUser: async (id, updates) => {
-        set((state) => ({ users: state.users.map(u => u.id === id ? { ...u, ...updates } : u) }));
-
-        const dbUpdates: any = {};
-        if (updates.name !== undefined) dbUpdates.name = updates.name;
-        if (updates.email !== undefined) dbUpdates.email = updates.email;
-        if (updates.role !== undefined) dbUpdates.role = updates.role;
-        if (updates.permissions !== undefined) dbUpdates.permissions = updates.permissions;
-        if (updates.password !== undefined) dbUpdates.password = updates.password;
-
-        // New Fields
-        if (updates.dni !== undefined) dbUpdates.dni = updates.dni;
-        if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
-        if (updates.address !== undefined) dbUpdates.address = updates.address;
-        if (updates.city !== undefined) dbUpdates.city = updates.city;
-        if (updates.zipCode !== undefined) dbUpdates.zip_code = updates.zipCode;
-        if (updates.country !== undefined) dbUpdates.country = updates.country;
-
-        // Optimistic update for currentUser as well
-        const currentUser = get().currentUser;
-        if (currentUser && currentUser.id === id) {
-            set({ currentUser: { ...currentUser, ...updates } });
+        const { users: prevUsers, currentUser: prevCurrent } = get();
+        // No guardamos la contraseña en el estado local
+        const { password, ...visible } = updates;
+        set((state) => ({ users: state.users.map(u => u.id === id ? { ...u, ...visible } : u) }));
+        if (prevCurrent && prevCurrent.id === id) {
+            set({ currentUser: { ...prevCurrent, ...visible } });
         }
-
-        const { error } = await supabase.from('users').update(dbUpdates).eq('id', id);
-        if (error) {
+        try {
+            await api.patch(`/users/${id}`, password ? updates : visible);
+        } catch (error: any) {
             console.error('Error updating user:', error.message);
-            // Revert on error could be implemented here
+            set({ users: prevUsers, currentUser: prevCurrent });
+            throw error;
         }
     },
 
     deleteUser: async (id) => {
+        const previous = get().users;
         set((state) => ({ users: state.users.filter(u => u.id !== id) }));
-        const { error } = await supabase.from('users').delete().eq('id', id);
-        if (error) console.error('Error deleting user:', error.message);
+        try {
+            await api.del(`/users/${id}`);
+        } catch (error: any) {
+            console.error('Error deleting user:', error.message);
+            set({ users: previous });
+        }
     },
 
     toggleWishlist: async (productId) => {
@@ -647,30 +369,20 @@ export const useStore = create<AppState>()(persist((set, get) => ({
         if (!currentUser) return;
 
         const currentWishlist = currentUser.wishlist || [];
-        const isInWishlist = currentWishlist.includes(productId);
-
-        const newWishlist = isInWishlist
+        const newWishlist = currentWishlist.includes(productId)
             ? currentWishlist.filter(id => id !== productId)
             : [...currentWishlist, productId];
 
-        // Optimistic Update
         const updatedUser = { ...currentUser, wishlist: newWishlist };
-        set({ currentUser: updatedUser });
-
-        // Also update in the main users list
         set(state => ({
+            currentUser: updatedUser,
             users: state.users.map(u => u.id === currentUser.id ? updatedUser : u)
         }));
 
-        // Persist to DB
-        const { error } = await supabase
-            .from('users')
-            .update({ wishlist: newWishlist })
-            .eq('id', currentUser.id);
-
-        if (error) {
+        try {
+            await api.put('/me/wishlist', { wishlist: newWishlist });
+        } catch (error) {
             console.error('Error updating wishlist:', error);
-            // Revert on error
             set({ currentUser });
         }
     },

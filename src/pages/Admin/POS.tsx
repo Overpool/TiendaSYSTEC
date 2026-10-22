@@ -24,7 +24,7 @@ export const POS = () => {
             didOpen: () => {
                 Swal.showLoading();
             }
-        }).then(() => {
+        }).then(async () => {
             const sale = {
                 id: Date.now().toString(),
                 items: [...posCart],
@@ -32,7 +32,12 @@ export const POS = () => {
                 date: new Date().toISOString(),
                 paymentMethod: method
             };
-            addSale(sale);
+            try {
+                await addSale(sale);
+            } catch (error: any) {
+                Swal.fire('Error', error?.message || 'No se pudo registrar la venta', 'error');
+                return;
+            }
             clearPosCart();
             Swal.fire({ icon: 'success', title: 'Pago Exitoso', text: `Recibo #${sale.id.slice(-6)}` });
         });
