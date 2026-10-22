@@ -40,7 +40,13 @@ export const Cart = () => {
             customer: currentUser ? { id: currentUser.id, name: currentUser.name } : undefined
         };
 
-        addSale(sale);
+        try {
+            await addSale(sale as any);
+        } catch (error: any) {
+            setIsProcessing(false);
+            Swal.fire('Error', error?.message || 'No se pudo registrar tu pedido', 'error');
+            return;
+        }
         clearCart();
         setIsProcessing(false);
 

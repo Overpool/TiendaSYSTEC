@@ -26,3 +26,12 @@ dist-ssr
 # Environment variables
 .env
 .env.*
+# Volcados de datos (pg_dump) — nunca subirlos
+backups/
+datos_*.sql
+*.dump
+
+# Cloudflare
+.wrangler
+.dev.vars*
+!.dev.vars.example

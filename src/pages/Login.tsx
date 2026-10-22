@@ -1,7 +1,7 @@
-import { useState, type FormEvent, useEffect } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { Lock, User, Eye, EyeOff, Mail, ArrowLeft, X } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, Mail, ArrowLeft, X, KeyRound } from 'lucide-react';
 import Swal from 'sweetalert2';
 
 type AuthMode = 'login' | 'register' | 'recover';
@@ -14,22 +14,19 @@ export const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
 
     // Recovery State
-    const [recoverStep, setRecoverStep] = useState<1 | 2>(1); // 1: Email, 2: New Password
-    const [foundUserId, setFoundUserId] = useState<string | null>(null);
+    const [recoverStep, setRecoverStep] = useState<1 | 2>(1); // 1: Email, 2: Código + nueva contraseña
+    const [code, setCode] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { login, register, users, updateUser, loadInitialData } = useStore();
+    const { login, register, requestPasswordReset, resetPassword } = useStore();
     const navigate = useNavigate();
-
-    useEffect(() => {
-        loadInitialData(); // Ensure users are loaded for recovery check
-    }, []);
 
     const resetForm = () => {
         setEmail('');
         setPassword('');
         setName('');
         setRecoverStep(1);
-        setFoundUserId(null);
+        setCode('');
     };
 
     const handleModeSwitch = (mode: AuthMode) => {
@@ -39,6 +36,16 @@ export const Login = () => {
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await submit();
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const submit = async () => {
 
         if (authMode === 'login') {
             try {
@@ -62,7 +69,12 @@ export const Login = () => {
             }
         } else if (authMode === 'register') {
             // Register
-            register({ name, email, password });
+            try {
+                await register({ name, email, password });
+            } catch (error: any) {
+                Swal.fire('Error', error?.message || 'No se pudo crear la cuenta', 'error');
+                return;
+            }
             Swal.fire({
                 icon: 'success',
                 title: '¡Cuenta creada!',
@@ -72,27 +84,18 @@ export const Login = () => {
             });
             handleModeSwitch('login');
         } else if (authMode === 'recover') {
-            // Recover Logic
-            if (recoverStep === 1) {
-                // Verify Email
-                const user = users.find(u => u.email === email);
-                if (user) {
-                    setFoundUserId(user.id);
+            // Recuperación: el Worker envía un código al correo y luego valida código + nueva contraseña
+            try {
+                if (recoverStep === 1) {
+                    await requestPasswordReset(email);
                     setRecoverStep(2);
                     Swal.fire({
-                        icon: 'success',
-                        title: 'Usuario encontrado',
-                        text: 'Ingresa tu nueva contraseña',
-                        timer: 1000,
-                        showConfirmButton: false
+                        icon: 'info',
+                        title: 'Revisa tu correo',
+                        text: 'Si el correo está registrado, te enviamos un código de 6 dígitos.',
                     });
                 } else {
-                    Swal.fire('Error', 'No existe una cuenta con este correo', 'error');
-                }
-            } else {
-                // Update Password
-                if (foundUserId) {
-                    await updateUser(foundUserId, { password: password });
+                    await resetPassword(email, code, password);
                     Swal.fire({
                         icon: 'success',
                         title: 'Contraseña Actualizada',
@@ -102,6 +105,8 @@ export const Login = () => {
                     });
                     handleModeSwitch('login');
                 }
+            } catch (error: any) {
+                Swal.fire('Error', error?.message || 'No se pudo completar la recuperación', 'error');
             }
         }
     };
@@ -162,6 +167,25 @@ export const Login = () => {
                         </div>
                     )}
 
+                    {authMode === 'recover' && recoverStep === 2 && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Código de verificación</label>
+                            <div className="relative">
+                                <KeyRound className="absolute left-3 top-2.5 text-gray-400" size={20} />
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition tracking-widest font-mono text-center text-lg"
+                                    placeholder="123456"
+                                    maxLength={6}
+                                    required
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {(authMode !== 'recover' || recoverStep === 2) && (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -176,6 +200,7 @@ export const Login = () => {
                                     className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition"
                                     placeholder="••••••••"
                                     required
+                                    minLength={authMode === 'login' ? undefined : 6}
                                 />
                                 <button
                                     type="button"
@@ -190,11 +215,12 @@ export const Login = () => {
 
                     <button
                         type="submit"
-                        className="w-full bg-red-600 text-white py-2.5 rounded-lg font-bold hover:bg-red-700 transition transform active:scale-95 flex items-center justify-center gap-2"
+                        disabled={isSubmitting}
+                        className="disabled:opacity-70 w-full bg-red-600 text-white py-2.5 rounded-lg font-bold hover:bg-red-700 transition transform active:scale-95 flex items-center justify-center gap-2"
                     >
                         {authMode === 'login' && 'Ingresar'}
                         {authMode === 'register' && 'Registrarse'}
-                        {authMode === 'recover' && (recoverStep === 1 ? 'Buscar Cuenta' : 'Actualizar Contraseña')}
+                        {authMode === 'recover' && (recoverStep === 1 ? 'Enviar código' : 'Actualizar Contraseña')}
                     </button>
                 </form>
 

@@ -63,11 +63,18 @@ export const Users = () => {
         setIsModalOpen(true);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (editingUser) {
-            updateUser(editingUser.id, formData);
+            try {
+                // Si la contraseña se deja vacía, no se cambia
+                const { password, ...rest } = formData as any;
+                await updateUser(editingUser.id, password ? formData : rest);
+            } catch (error: any) {
+                Swal.fire('Error', error?.message || 'No se pudo actualizar', 'error');
+                return;
+            }
             Swal.fire({
                 icon: 'success',
                 title: 'Actualizado',
@@ -80,7 +87,12 @@ export const Users = () => {
                 Swal.fire('Error', 'La contraseña es requerida para nuevos usuarios', 'error');
                 return;
             }
-            addUser(formData as UserType);
+            try {
+                await addUser(formData as UserType);
+            } catch (error: any) {
+                Swal.fire('Error', error?.message || 'No se pudo crear el usuario', 'error');
+                return;
+            }
             Swal.fire({
                 icon: 'success',
                 title: 'Creado',
@@ -341,7 +353,7 @@ export const Users = () => {
                         <input
                             type="text"
                             className="w-full border p-2 rounded"
-                            value={formData.password}
+                            value={formData.password || ''}
                             onChange={e => setFormData({ ...formData, password: e.target.value })}
                             required={!editingUser}
                         />

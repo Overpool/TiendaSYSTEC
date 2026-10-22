@@ -31,7 +31,7 @@ export const EditProfile = ({ onClose }: EditProfileProps) => {
     // State for all fields
     const [formData, setFormData] = useState({
         name: currentUser?.name || '',
-        password: currentUser?.password || '',
+        password: '', // vacío = no cambiar
         dni: currentUser?.dni || '',
         phone: currentUser?.phone || '',
         address: currentUser?.address || '',
@@ -52,7 +52,8 @@ export const EditProfile = ({ onClose }: EditProfileProps) => {
 
         setIsLoading(true);
         try {
-            await updateUser(currentUser.id, formData);
+            const { password, ...profile } = formData;
+            await updateUser(currentUser.id, password ? formData : profile);
 
             Swal.fire({
                 icon: 'success',
@@ -100,7 +101,7 @@ export const EditProfile = ({ onClose }: EditProfileProps) => {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InputField label="Nombre Completo" name="name" icon={User} placeholder="Tu nombre" required value={formData.name} onChange={handleChange} />
-                            <InputField label="Contraseña" name="password" type="text" icon={Lock} placeholder="Nueva contraseña" required value={formData.password} onChange={handleChange} />
+                            <InputField label="Contraseña" name="password" type="text" icon={Lock} placeholder="Dejar vacío para no cambiar" value={formData.password} onChange={handleChange} />
                         </div>
                     </section>
 

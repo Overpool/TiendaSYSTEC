@@ -1,0 +1,5 @@
+# Copia este archivo como .dev.vars para desarrollo local (NO lo subas a GitHub)
+DATABASE_URL="postgresql://usuario:password@ep-xxxx-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
+JWT_SECRET="cambia-esto-por-una-cadena-aleatoria-larga"
+# Opcional: para enviar el código de recuperación de contraseña
+# RESEND_API_KEY="re_xxxxxxxx"
