@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Lock, User, Eye, EyeOff, Mail, ArrowLeft, X, KeyRound } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -9,7 +9,11 @@ type AuthMode = 'login' | 'register' | 'recover';
 type RecoverStep = 1 | 2 | 3; // 1: correo, 2: código, 3: nueva contraseña
 
 export const Login = () => {
-    const [authMode, setAuthMode] = useState<AuthMode>('login');
+    // ?redirect=/cart vuelve al carrito tras iniciar sesión; ?mode=register abre el registro
+    const [searchParams] = useSearchParams();
+    const rawRedirect = searchParams.get('redirect');
+    const redirectTo = rawRedirect?.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null; // solo rutas internas
+    const [authMode, setAuthMode] = useState<AuthMode>(searchParams.get('mode') === 'register' ? 'register' : 'login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,7 +85,7 @@ export const Login = () => {
                         timer: 1500,
                         showConfirmButton: false
                     });
-                    navigate(currentUser?.role === 'shopper' ? '/' : '/admin');
+                    navigate(redirectTo ?? (currentUser?.role === 'shopper' ? '/' : '/admin'));
                 } else {
                     Swal.fire('Error', 'Credenciales inválidas', 'error');
                 }

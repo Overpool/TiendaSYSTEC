@@ -2,7 +2,7 @@
 // Cada token sirve una sola vez: el padre debe volver a montarlo (cambiando su `key`) tras cada envío.
 
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { getPublicConfig, loadScript } from '../lib/config';
 
 declare global {
     interface Window {
@@ -15,29 +15,10 @@ declare global {
 
 const SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-let scriptPromise: Promise<void> | null = null;
-const loadScript = () => {
-    scriptPromise ??= new Promise<void>((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = SCRIPT_URL;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => { scriptPromise = null; reject(new Error('No se pudo cargar Turnstile')); };
-        document.head.appendChild(s);
-    });
-    return scriptPromise;
-};
-
-let siteKeyPromise: Promise<string | null> | null = null;
-const getSiteKey = () => {
-    siteKeyPromise ??= api.get<{ turnstileSiteKey: string | null }>('/config')
-        .then((c) => c.turnstileSiteKey)
-        .catch(() => { siteKeyPromise = null; return null; });
-    return siteKeyPromise;
-};
+const getSiteKey = () => getPublicConfig().then((c) => c.turnstileSiteKey).catch(() => null);
 
 interface TurnstileProps {
-    action: 'login' | 'register' | 'forgot' | 'verify';
+    action: 'login' | 'register' | 'forgot' | 'verify' | 'complaint';
     onToken: (token: string | null) => void;
 }
 
@@ -53,7 +34,7 @@ export const Turnstile = ({ action, onToken }: TurnstileProps) => {
         let cancelled = false;
         onTokenRef.current(null);
 
-        Promise.all([getSiteKey(), loadScript()])
+        Promise.all([getSiteKey(), loadScript(SCRIPT_URL)])
             .then(([siteKey]) => {
                 if (cancelled || !ref.current || !window.turnstile) return;
                 if (!siteKey) { setError('La verificación de seguridad no está disponible.'); return; }

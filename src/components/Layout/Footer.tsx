@@ -1,6 +1,8 @@
 
-import { Facebook, Instagram, MapPin, MessageCircle, ChevronUp, Music, X } from 'lucide-react';
+import { Facebook, MapPin, MessageCircle, ChevronUp, X, BookOpen } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { BUSINESS } from '../../../shared/business';
 
 const WA_CONTACTS = [
     {
@@ -82,14 +84,8 @@ export const Footer = () => {
 
                         {/* Social Icons */}
                         <div className="flex justify-center lg:justify-start gap-4 mt-6">
-                            <a href="https://www.facebook.com/share/1Gbz6p5FaW/" className="w-10 h-10 bg-[#3b5998] text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm" target="_blank" rel="noopener noreferrer">
+                            <a href={BUSINESS.facebook} title="Facebook" className="w-10 h-10 bg-[#3b5998] text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm" target="_blank" rel="noopener noreferrer">
                                 <Facebook size={20} />
-                            </a>
-                            <a href="#" className="w-10 h-10 bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm">
-                                <Instagram size={20} />
-                            </a>
-                            <a href="#" className="w-10 h-10 bg-black text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm">
-                                <Music size={20} />
                             </a>
                         </div>
                     </div>
@@ -105,6 +101,23 @@ export const Footer = () => {
                             <p>Desarrollado por: <a href="https://www.linkedin.com/in/luis-figueroa-arce-4185b8214/" target="_blank" rel="noopener noreferrer">Figueroa Arce Luis</a></p>
                         </div>
                     </div>
+                </div>
+
+                {/* Información legal (Términos, Cambios y devoluciones, Privacidad, Libro de Reclamaciones) */}
+                <div className="mt-10 pt-6 border-t border-blue-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
+                        <Link to="/terminos" className="hover:text-red-600 hover:underline">Términos y Condiciones</Link>
+                        <Link to="/cambios-y-devoluciones" className="hover:text-red-600 hover:underline">Cambios, Devoluciones y Garantía</Link>
+                        <Link to="/privacidad" className="hover:text-red-600 hover:underline">Política de Privacidad</Link>
+                    </nav>
+                    <Link to="/libro-de-reclamaciones"
+                        className="flex items-center gap-3 bg-white border-2 border-red-600 rounded-xl px-4 py-2 hover:bg-red-50 transition shadow-sm">
+                        <BookOpen size={28} className="text-red-600" />
+                        <span className="leading-tight text-left">
+                            <span className="block font-bold text-slate-800">Libro de Reclamaciones</span>
+                            <span className="block text-xs text-slate-500">Registra tu reclamo o queja</span>
+                        </span>
+                    </Link>
                 </div>
             </div>
 

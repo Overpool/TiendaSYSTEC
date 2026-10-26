@@ -1,5 +1,6 @@
 import { useStore } from '../../store/useStore';
 import { X, ShoppingBag, Calendar, CreditCard } from 'lucide-react';
+import { paymentLabel } from '../../lib/payments';
 
 interface PurchaseHistoryProps {
     onClose: () => void;
@@ -47,9 +48,9 @@ export const PurchaseHistory = ({ onClose }: PurchaseHistoryProps) => {
                                                 <Calendar size={16} />
                                                 {new Date(sale.date).toLocaleDateString()}
                                             </div>
-                                            <div className="flex items-center gap-1 capitalize">
+                                            <div className="flex items-center gap-1">
                                                 <CreditCard size={16} />
-                                                {sale.paymentMethod}
+                                                {paymentLabel(sale.paymentMethod)}
                                             </div>
                                         </div>
                                         <div className="text-right">
