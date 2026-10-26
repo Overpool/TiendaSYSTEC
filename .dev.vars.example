@@ -9,3 +9,9 @@ TURNSTILE_SITE_KEY="1x00000000000000000000AA"
 TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
 # Solo local: muestra el codigo de recuperacion en la consola si no hay RESEND_API_KEY
 DEV_LOG_CODES="true"
+
+# Culqi: la llave publica va en wrangler.jsonc (CULQI_PUBLIC_KEY); la privada sk_test_ va aqui y en wrangler secret put
+# CULQI_SECRET_KEY="sk_test_xxxxxxxx"
+
+# apisPeru (consulta de DNI para los envios): token de https://apisperu.com, tambien con wrangler secret put
+# APISPERU_TOKEN="xxxxxxxx"

@@ -24,7 +24,40 @@ export interface Sale {
     items: CartItem[];
     total: number;
     date: string;
-    paymentMethod: 'cash' | 'card' | 'yape' | 'plin';
+    // billetera = Yape/Plin pagado con QR a través de Culqi
+    paymentMethod: 'cash' | 'card' | 'yape' | 'plin' | 'billetera';
+    paymentRef?: string | null; // id del cobro u orden en Culqi (ventas online)
+    customer?: { firstName: string; lastName: string; email: string; phone: string; dni?: string } | null;
+}
+
+export type ShipmentStatus = 'pendiente' | 'preparando' | 'enviado' | 'en_agencia' | 'entregado' | 'cancelado';
+
+export interface ShalomAgency {
+    id: number;
+    departamento: string;
+    provincia: string;
+    distrito: string;
+    nombre: string;
+    direccion: string;
+    horario: string;
+}
+
+export interface Shipment {
+    id: string;
+    saleId: string;
+    status: ShipmentStatus;
+    dni: string;
+    recipientName: string;
+    phone: string;
+    email: string;
+    department: string;
+    province: string;
+    agency: { id: number | null; nombre: string; direccion: string; distrito: string; horario: string };
+    trackingCode: string | null;
+    notes: string | null;
+    createdAt: string;
+    updatedAt: string;
+    sale: { total: number; items: CartItem[]; paymentMethod: Sale['paymentMethod']; paymentRef: string | null; date: string };
 }
 
 export interface PurchaseItem {

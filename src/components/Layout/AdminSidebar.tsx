@@ -1,6 +1,6 @@
 
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, History, LogOut, Users, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, History, LogOut, Users, TrendingUp, Truck, BookOpen } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import clsx from 'clsx';
 
@@ -20,6 +20,8 @@ export const AdminSidebar = ({ isOpen, onClose }: AdminSidebarProps) => {
         { to: '/admin/pos', icon: ShoppingCart, label: 'Punto de Venta', permission: 'pos' },
         { to: '/admin/purchases', icon: TrendingUp, label: 'Compras', permission: 'inventory' },
         { to: '/admin/sales', icon: History, label: 'Historial Ventas', permission: 'sales' },
+        { to: '/admin/shipments', icon: Truck, label: 'Envíos', permission: 'shipments' },
+        { to: '/admin/complaints', icon: BookOpen, label: 'Reclamaciones', permission: 'complaints' },
         { to: '/admin/reports', icon: TrendingUp, label: 'Reportes', permission: 'admin' },
         { to: '/admin/users', icon: Users, label: 'Usuarios', permission: 'users' },
     ];

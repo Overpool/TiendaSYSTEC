@@ -28,9 +28,12 @@
   "vars": {
     "MAIL_FROM": "SYSTEC <no-reply@systecfl.site>",
     // Site key pública del widget de Turnstile "SYSTEC auth" (systecfl.site y www). En local se usa la de prueba de .dev.vars
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAFgQEzgrh2W8VHJp"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFgQEzgrh2W8VHJp",
+    // Llave pública de Culqi (CulqiPanel → Desarrollo → API Keys). Cambiar a pk_live_ al pasar a producción
+    "CULQI_PUBLIC_KEY": "pk_test_WEVuEVtlBL73hBZw"
   }
-  // Secretos (NO van aquí): DATABASE_URL, JWT_SECRET, TURNSTILE_SECRET_KEY, RESEND_API_KEY
+  // Secretos (NO van aquí): DATABASE_URL, JWT_SECRET, TURNSTILE_SECRET_KEY, RESEND_API_KEY, CULQI_SECRET_KEY
+  //   npx wrangler secret put CULQI_SECRET_KEY        (llave privada sk_test_/sk_live_ de Culqi)
   //   npx wrangler secret put DATABASE_URL
   //   npx wrangler secret put JWT_SECRET
   //   npx wrangler secret put TURNSTILE_SECRET_KEY

@@ -2,6 +2,15 @@ import { useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { Search, Download, Calendar } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { paymentLabel } from '../../lib/payments';
+
+const PAYMENT_BADGE: Record<string, string> = {
+    card: 'bg-blue-100 text-blue-700',
+    cash: 'bg-green-100 text-green-700',
+    yape: 'bg-purple-100 text-purple-700',
+    plin: 'bg-teal-100 text-teal-700',
+    billetera: 'bg-teal-100 text-teal-700',
+};
 
 export const SalesHistory = () => {
     const { sales } = useStore();
@@ -36,7 +45,11 @@ export const SalesHistory = () => {
         const data = filteredSales.map(sale => ({
             'ID Transacción': sale.id,
             'Fecha': new Date(sale.date).toLocaleString(),
-            'Pago': sale.paymentMethod === 'card' ? 'TARJETA' : 'EFECTIVO',
+            'Pago': paymentLabel(sale.paymentMethod).toUpperCase(),
+            'Ref. Culqi': sale.paymentRef ?? '',
+            'Cliente': sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : '',
+            'Celular': sale.customer?.phone ?? '',
+            'Correo': sale.customer?.email ?? '',
             'Items': sale.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
             'Monto Total': sale.total
         }));
@@ -102,6 +115,7 @@ export const SalesHistory = () => {
                                 <th className="px-6 py-3 font-semibold">Fecha</th>
                                 <th className="px-6 py-3 font-semibold">ID Transacción</th>
                                 <th className="px-6 py-3 font-semibold">Pago</th>
+                                <th className="px-6 py-3 font-semibold">Cliente</th>
                                 <th className="px-6 py-3 font-semibold">Items</th>
                                 <th className="px-6 py-3 font-semibold text-right">Monto</th>
                             </tr>
@@ -114,10 +128,17 @@ export const SalesHistory = () => {
                                     </td>
                                     <td className="px-6 py-4 text-sm font-mono text-slate-500">#{sale.id}</td>
                                     <td className="px-6 py-4 text-sm">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${sale.paymentMethod === 'card' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                                            }`}>
-                                            {sale.paymentMethod === 'card' ? 'TARJETA' : 'EFECTIVO'}
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${PAYMENT_BADGE[sale.paymentMethod] ?? 'bg-slate-100 text-slate-700'}`}>
+                                            {paymentLabel(sale.paymentMethod).toUpperCase()}
                                         </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-600">
+                                        {sale.customer ? (
+                                            <>
+                                                <div className="font-medium text-slate-800">{sale.customer.firstName} {sale.customer.lastName}</div>
+                                                <div className="text-xs">{sale.customer.phone} · {sale.customer.email}</div>
+                                            </>
+                                        ) : <span className="text-slate-400">Mostrador</span>}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-slate-600">
                                         {sale.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
@@ -129,7 +150,7 @@ export const SalesHistory = () => {
                             ))}
                             {filteredSales.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan={6}className="px-6 py-12 text-center text-slate-400">
                                         No se encontraron ventas con los filtros seleccionados
                                     </td>
                                 </tr>

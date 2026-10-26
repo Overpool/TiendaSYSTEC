@@ -127,6 +127,8 @@ export const Users = () => {
         { id: 'inventory', label: 'Inventario' },
         { id: 'pos', label: 'Punto de Venta' },
         { id: 'sales', label: 'Historial de Ventas' },
+        { id: 'shipments', label: 'Envíos' },
+        { id: 'complaints', label: 'Libro de Reclamaciones' },
         { id: 'users', label: 'Gestión de Usuarios' }
     ];
 

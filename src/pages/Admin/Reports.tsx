@@ -78,7 +78,7 @@ export const Reports = () => {
         filteredSales.forEach(sale => {
             const method = sale.paymentMethod === 'card' ? 'Tarjeta' :
                 sale.paymentMethod === 'cash' ? 'Efectivo' :
-                    (sale.paymentMethod === 'yape' || sale.paymentMethod === 'plin') ? 'Yape/Plin' : 'Otros';
+                    (sale.paymentMethod === 'yape' || sale.paymentMethod === 'plin' || sale.paymentMethod === 'billetera') ? 'Yape/Plin' : 'Otros';
             map.set(method, (map.get(method) || 0) + 1);
         });
         return Array.from(map.entries()).map(([name, value]) => ({ name, value }));

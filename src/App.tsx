@@ -14,6 +14,12 @@ import { Purchases } from './pages/Admin/Purchases';
 import { useStore } from './store/useStore';
 import { Users } from './pages/Admin/Users';
 import { Reports } from './pages/Admin/Reports';
+import { Shipments } from './pages/Admin/Shipments';
+import { Complaints } from './pages/Admin/Complaints';
+import { Terms } from './pages/Legal/Terms';
+import { Returns } from './pages/Legal/Returns';
+import { Privacy } from './pages/Legal/Privacy';
+import { ComplaintsBook } from './pages/Legal/ComplaintsBook';
 import { Cart } from './pages/Cart';
 import { Footer } from './components/Layout/Footer';
 import { ScrollToTop } from './components/ScrollToTop';
@@ -77,6 +83,10 @@ function App() {
         <Route path="/" element={<StoreLayout />}>
           <Route index element={<Store />} />
           <Route path="cart" element={<Cart />} />
+          <Route path="terminos" element={<Terms />} />
+          <Route path="cambios-y-devoluciones" element={<Returns />} />
+          <Route path="privacidad" element={<Privacy />} />
+          <Route path="libro-de-reclamaciones" element={<ComplaintsBook />} />
         </Route>
 
         <Route path="/login" element={<Login />} />
@@ -88,6 +98,8 @@ function App() {
           <Route path="pos" element={<POS />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="sales" element={<SalesHistory />} />
+          <Route path="shipments" element={<Shipments />} />
+          <Route path="complaints" element={<Complaints />} />
           <Route path="users" element={<Users />} />
           <Route path="users" element={<Users />} />
           <Route path="reports" element={<Reports />} />
